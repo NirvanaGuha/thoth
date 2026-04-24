@@ -1,0 +1,42 @@
+name: Publish CLI
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to publish (e.g. v1.0.0)"
+        required: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write   # for npm provenance
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name || github.event.inputs.tag }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Sync skill into cli/assets
+        run: |
+          rm -rf cli/assets/skill
+          cp -r skill cli/assets/skill
+          # Don't ship user personas if anything leaked in.
+          find cli/assets/skill/personas -mindepth 1 ! -name 'README.md' -delete || true
+
+      - name: Verify CLI help
+        run: node cli/bin/thoth.js --help
+
+      - name: Publish to npm
+        working-directory: cli
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --provenance --access public

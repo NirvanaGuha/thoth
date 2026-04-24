@@ -1,0 +1,22 @@
+{
+  "name": "thoth",
+  "displayName": "Thoth",
+  "version": "1.0.0",
+  "description": "Open-source LinkedIn voice skill for Claude. Framework-driven persona interview + daily post generation on a 30/25/20/15/10 content mix.",
+  "license": "MIT",
+  "homepage": "https://github.com/NirvanaGuha/thoth",
+  "repository": "https://github.com/NirvanaGuha/thoth",
+  "entry": "skill/SKILL.md",
+  "frameworks": [
+    "12 Jungian brand archetypes (Pearson/Mark)",
+    "Nielsen Norman 4-D tone-of-voice model",
+    "Hot-take / anti-voice elicitation"
+  ],
+  "targets": [
+    "claude-code",
+    "claude-desktop",
+    "cowork",
+    "cursor",
+    "windsurf"
+  ]
+}

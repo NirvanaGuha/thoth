@@ -1,0 +1,31 @@
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# npm publish artifacts
+cli/*.tgz
+
+# CLI bundled-assets mirror — regenerated from /skill at release time.
+# Keep this commented out if you want it in git; uncomment if you'd rather
+# not duplicate the skill/ content in the repo.
+# cli/assets/skill/
+
+# macOS
+.DS_Store
+
+# Editors
+.idea/
+.vscode/
+*.swp
+*~
+
+# Local test installs
+test-install/
+.claude/skills/thoth/
+.cursor/skills/thoth/
+
+# User personas (if anyone ever runs Thoth inside this repo as a test)
+skill/personas/*/
+!skill/personas/README.md

@@ -1,0 +1,47 @@
+{
+  "name": "thoth-skill",
+  "version": "1.0.0",
+  "description": "Install Thoth — the open-source LinkedIn voice skill for Claude. One command to set up framework-driven persona interviews and daily post generation.",
+  "keywords": [
+    "claude",
+    "claude-skill",
+    "claude-code",
+    "linkedin",
+    "writing",
+    "personal-brand",
+    "content-calendar",
+    "ai-skills",
+    "thoth"
+  ],
+  "homepage": "https://github.com/NirvanaGuha/thoth#readme",
+  "bugs": {
+    "url": "https://github.com/NirvanaGuha/thoth/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NirvanaGuha/thoth.git"
+  },
+  "license": "MIT",
+  "author": {
+    "name": "Nirvana Guha",
+    "url": "https://github.com/NirvanaGuha"
+  },
+  "type": "commonjs",
+  "bin": {
+    "thoth-skill": "./bin/thoth.js",
+    "thoth": "./bin/thoth.js"
+  },
+  "files": [
+    "bin/",
+    "assets/",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node bin/thoth.js --help"
+  },
+  "dependencies": {}
+}
