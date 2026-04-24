@@ -125,6 +125,16 @@ function untarGz(buf, destRoot) {
     pos += 512;
 
     if (!name) { pos += Math.ceil(size / 512) * 512; continue; }
+
+    // Skip extended-header entries (pax global, pax local, GNU long name / link).
+    // GitHub's release tarballs start with a pax global header whose name is NOT
+    // the repo folder — letting it set topLevel makes every subsequent entry
+    // fail the `relative.startsWith('skill/')` filter, silently extracting nothing.
+    if (type === 'x' || type === 'g' || type === 'K' || type === 'L') {
+      pos += Math.ceil(size / 512) * 512;
+      continue;
+    }
+
     if (topLevel === null) topLevel = name.split('/')[0];
     const relative = name.startsWith(topLevel + '/') ? name.slice(topLevel.length + 1) : name;
 
@@ -141,6 +151,9 @@ function untarGz(buf, destRoot) {
       fs.writeFileSync(out, raw.slice(pos, pos + size));
     }
     pos += Math.ceil(size / 512) * 512;
+  }
+  if (!topLevel) {
+    throw new Error('Tarball appears empty or malformed — nothing extracted.');
   }
 }
 
