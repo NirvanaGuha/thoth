@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write   # for npm provenance
+      id-token: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -22,14 +22,16 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           registry-url: "https://registry.npmjs.org"
+
+      - name: Ensure npm supports trusted publishing
+        run: npm install -g npm@latest
 
       - name: Sync skill into cli/assets
         run: |
           rm -rf cli/assets/skill
           cp -r skill cli/assets/skill
-          # Don't ship user personas if anything leaked in.
           find cli/assets/skill/personas -mindepth 1 ! -name 'README.md' -delete || true
 
       - name: Verify CLI help
@@ -37,6 +39,4 @@ jobs:
 
       - name: Publish to npm
         working-directory: cli
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm publish --provenance --access public
