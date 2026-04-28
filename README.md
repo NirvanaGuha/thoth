@@ -410,11 +410,3 @@ High-value contributions:
 [MIT](./LICENSE).
 
 ---
-
-> **Publishing checklist (first release):**
->
-> 1. `git init && git add . && git commit -m "feat: thoth v1.0.0"`
-> 2. `gh repo create NirvanaGuha/thoth --public --source=. --push`
-> 3. Set the `NPM_TOKEN` secret in the repo settings (Settings → Secrets and variables → Actions). Get a token at https://www.npmjs.com/settings/YOUR-NPM-USER/tokens.
-> 4. Copy the sidebar description and Topics from [ABOUT.md](./ABOUT.md) into the repo's **About** settings.
-> 5. Cut a release: `gh release create v1.0.0 --generate-notes`. The publish workflow will push `thoth-skill` to npm.
