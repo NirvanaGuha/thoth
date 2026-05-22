@@ -408,5 +408,3 @@ High-value contributions:
 ## License
 
 [MIT](./LICENSE).
-
----
