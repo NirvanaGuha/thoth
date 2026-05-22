@@ -20,6 +20,52 @@ Output is always **copy-ready post text**. Thoth never publishes to LinkedIn on 
 
 ---
 
+## Where persona data lives
+
+Persona data — `personas/<name>/persona.md`, drafts, history, recent inputs — is **mutable user data** and lives **outside** the skill folder. The skill itself (this `SKILL.md`, `references/`, `scripts/`) is immutable code and stays at `~/.claude/skills/thoth/`. Separating them lets the user grant blanket read/write on the data root without exposing Claude's own config files.
+
+### Resolving the data root
+
+On every `/thoth ...` invocation, resolve the **data root** in this order:
+
+1. If `./.thoth/personas/` exists relative to the current working directory → data root is `./.thoth/` (per-project mode — useful for teams checking personas into a project repo).
+2. Else if `~/.thoth/personas/` exists → data root is `~/.thoth/` (global mode, default).
+3. Else if a legacy install exists at `~/.claude/skills/thoth/personas/` and migration has been declined this session → data root is `~/.claude/skills/thoth/` (legacy mode — see migration below).
+4. Else → create `~/.thoth/personas/` and use it. This is the default landing place for new installs.
+
+Throughout this document, any path written as `personas/<name>/...` resolves to `<data-root>/personas/<name>/...`. The `personas/.active` file lives at `<data-root>/personas/.active`.
+
+### One-time migration from the legacy location
+
+Before v1.1, Thoth stored persona data inside `~/.claude/skills/thoth/personas/`. On the first `/thoth ...` invocation after upgrade, check for legacy data and offer to move it:
+
+1. **Trigger condition.** All of these are true:
+   - `~/.claude/skills/thoth/personas/` exists and contains at least one persona subfolder (not just `.active` or the template).
+   - `~/.thoth/personas/` does **not** exist.
+   - `./.thoth/personas/` does **not** exist relative to CWD.
+2. **Prompt the user once per session:**
+   > *"Found existing Thoth personas at the legacy location `~/.claude/skills/thoth/personas/`. Newer versions store persona data in `~/.thoth/` instead — outside Claude's config root, so you can grant blanket read/write without affecting Claude's own settings. Move now? (yes / not now)"*
+3. **On `yes`:**
+   - Create `~/.thoth/` if it doesn't exist.
+   - `mv ~/.claude/skills/thoth/personas ~/.thoth/personas`.
+   - Write a one-line breadcrumb at `~/.claude/skills/thoth/personas-MIGRATED.md` containing the date and the new location, so anyone inspecting the old path knows what happened.
+   - Confirm: *"Moved. Data root is now `~/.thoth/`. The skill itself is still at `~/.claude/skills/thoth/`."*
+4. **On `not now`:** Continue using `~/.claude/skills/thoth/personas/` as the data root for this session (legacy mode). Ask again on the next invocation.
+
+The migration is idempotent — once moved, the trigger condition fails on future invocations and the prompt does not appear.
+
+### Quick reference
+
+| Concept | Path |
+|---|---|
+| Skill code (immutable) | `~/.claude/skills/thoth/` |
+| Data root — global default | `~/.thoth/` |
+| Data root — per-project | `./.thoth/` (when present in CWD) |
+| Data root — legacy (pre-v1.1) | `~/.claude/skills/thoth/` |
+| Active persona pointer | `<data-root>/personas/.active` |
+
+---
+
 ## Commands
 
 All commands are of the form `/thoth [subcommand] [args...]`. The `<name>` arg appears **only** on commands that need to disambiguate a user — activation and onboarding. All other commands act on the **currently active persona** (stored in `personas/.active`).
@@ -47,10 +93,11 @@ All commands are of the form `/thoth [subcommand] [args...]`. The `<name>` arg a
 
 On receiving any `/thoth ...` invocation, follow these steps in order:
 
-1. **Parse** the subcommand. Unknown subcommand → show `help`.
-2. **Resolve the active persona** by reading `personas/.active` (single line with the username). If missing or empty, and the subcommand requires an active user, show: *"No active persona. Run `/thoth <name>` to activate one, or `/thoth list` to see who's on this install."*
-3. **Check the persona is onboarded** — `personas/<name>/persona.md` exists and is marked `STATUS: ACTIVE`. If not, route to `onboard` first.
-4. **Dispatch** to the relevant section below.
+1. **Resolve the data root** using the algorithm in "Where persona data lives" above. If a legacy install at `~/.claude/skills/thoth/personas/` is detected and the user hasn't been prompted this session, run the one-time migration offer before continuing.
+2. **Parse** the subcommand. Unknown subcommand → show `help`.
+3. **Resolve the active persona** by reading `personas/.active` (single line with the username). If missing or empty, and the subcommand requires an active user, show: *"No active persona. Run `/thoth <name>` to activate one, or `/thoth list` to see who's on this install."*
+4. **Check the persona is onboarded** — `personas/<name>/persona.md` exists and is marked `STATUS: ACTIVE`. If not, route to `onboard` first.
+5. **Dispatch** to the relevant section below.
 
 ### `/thoth <name>` — activate
 
@@ -113,7 +160,9 @@ Then say which type is "next up" based on the ratio gap.
 
 Use the `schedule` skill to create a recurring task. The scheduled prompt should be a self-contained instruction like:
 
-> "Run `/thoth daily` for the persona currently marked active in `~/.claude/skills/thoth/personas/.active`."
+> "Run `/thoth daily` for the currently active Thoth persona."
+
+The skill resolves the active persona itself when the scheduled task fires — don't bake a data-root path into the prompt, since the data root is resolved at runtime per the rules in "Where persona data lives."
 
 Default time: 08:30 in the user's local timezone. If the user passes a time, use it. Store the scheduled task name in `personas/<active>/schedule.txt` so `unschedule` can find it.
 
@@ -139,8 +188,10 @@ If any check fails, silently rewrite and re-check. Only output when all pass.
 
 ## File layout
 
+### Skill code — at `~/.claude/skills/thoth/` (immutable)
+
 ```
-thoth/
+~/.claude/skills/thoth/
 ├── SKILL.md                         # this file
 ├── references/
 │   ├── onboarding-interview.md      # the full interview protocol
@@ -154,18 +205,24 @@ thoth/
 │   ├── example-posts.md             # cross-archetype voice calibration
 │   ├── persona-template.md          # the skeleton persona.md
 │   └── commands.md                  # command reference for /thoth help
-├── personas/
-│   ├── .active                      # single line: active username
-│   └── <username>/
-│       ├── persona.md               # canonical voice doc
-│       ├── topics.md                # pillar topics + expertise areas
-│       ├── recent.md                # daily inputs, timestamped
-│       ├── history.yaml             # posted-log (date, type, topic, wc)
-│       ├── last-post.md             # most recent draft, for regenerate
-│       ├── sources.yaml             # connected git repos (paths only)
-│       └── schedule.txt             # scheduled-task name, if any
 └── scripts/
     └── (reserved for future helpers)
+```
+
+### Persona data — at `<data-root>/` (mutable, resolved at runtime)
+
+```
+<data-root>/                         # ~/.thoth/ (default), ./.thoth/ (per-project), or legacy ~/.claude/skills/thoth/
+└── personas/
+    ├── .active                      # single line: active username
+    └── <username>/
+        ├── persona.md               # canonical voice doc
+        ├── topics.md                # pillar topics + expertise areas
+        ├── recent.md                # daily inputs, timestamped
+        ├── history.yaml             # posted-log (date, type, topic, wc)
+        ├── last-post.md             # most recent draft, for regenerate
+        ├── sources.yaml             # connected git repos (paths only)
+        └── schedule.txt             # scheduled-task name, if any
 ```
 
 **Important:** never create a persona folder with a name that contains slashes, spaces, or shell-metacharacters. Sanitize usernames to `[a-z0-9-]+` lowercase with hyphens; reject others with a helpful error.

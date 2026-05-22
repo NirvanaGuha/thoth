@@ -142,8 +142,8 @@ THOTH_AI=cursor     THOTH_SCOPE=local     THOTH_REF=v1.0.0
 npx thoth-skill init                   # default: user-global, Claude
 npx thoth-skill init --local           # project-local (./.claude/skills/thoth)
 npx thoth-skill init --ai cursor       # Cursor
-npx thoth-skill update                 # pull latest, preserving your personas/
-npx thoth-skill uninstall              # remove (prompts if personas/ exist)
+npx thoth-skill update                 # pull latest — your personas in ~/.thoth/ are untouched
+npx thoth-skill uninstall              # remove the skill — your personas in ~/.thoth/ are kept
 ```
 
 Or install the CLI globally:
@@ -250,7 +250,9 @@ A single install supports any number of personas. Families, teams, and agencies 
 /thoth                # draft for Rakesh
 ```
 
-Personas live at `~/.claude/skills/thoth/personas/<name>/` — each has its own voice file, pillar topics, post history, and recent inputs. The active persona is stored in `personas/.active`.
+Personas live at `~/.thoth/personas/<name>/` — each has its own voice file, pillar topics, post history, and recent inputs. The active persona is stored in `~/.thoth/personas/.active`. For per-project setups (e.g. a team checking personas into a repo), create `./.thoth/` in the project root and Thoth will use it instead.
+
+> **Note:** persona data lives **outside** the skill folder (`~/.claude/skills/thoth/`) so you can grant blanket read/write to your persona data without exposing Claude's own config files. If you're upgrading from a pre-v1.1 install, the first `/thoth ...` command after upgrade will offer to migrate your existing personas from the old location.
 
 ---
 
@@ -380,9 +382,9 @@ If the draft trips any rule, Thoth rewrites. If it can't rewrite to pass, it tel
 
 ## Privacy
 
-Everything stays on your machine. Thoth writes to `~/.claude/skills/thoth/personas/` and nowhere else. It does not transmit persona data, post history, or inputs anywhere. No telemetry.
+Everything stays on your machine. Thoth writes to `~/.thoth/personas/` (or `./.thoth/personas/` in a project that opts into local mode) and nowhere else. It does not transmit persona data, post history, or inputs anywhere. No telemetry.
 
-To back up: copy `personas/`. To migrate machines: copy `personas/` to the new install.
+To back up: copy `~/.thoth/`. To migrate machines: copy `~/.thoth/` to the new install. The skill code itself at `~/.claude/skills/thoth/` is reinstalled cleanly on the new machine — only the data root needs copying.
 
 ---
 

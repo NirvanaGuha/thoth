@@ -18,6 +18,8 @@ thoth/
 
 **The golden rule:** all skill content lives in `skill/`. Never edit `cli/assets/skill/` directly — it's re-synced from `skill/` at release time. If you edit both, `skill/` wins.
 
+**Code vs data separation:** the `skill/` directory is immutable skill code. **Persona data does not live here.** At runtime Thoth resolves a data root — `./.thoth/` if present in CWD, else `~/.thoth/` (default), else legacy `~/.claude/skills/thoth/` for pre-v1.1 installs. The `skill/personas/` directory in this repo is intentionally empty except for `README.md` (which documents the resolution rules). The resolution algorithm and one-time migration logic are defined in `skill/SKILL.md` under "Where persona data lives" — do not bypass it by hardcoding paths anywhere else in the skill.
+
 ## Conventions
 
 - **Ratio numbers** appear in several files (`SKILL.md`, `skill/references/content-mix.md`, `skill/references/post-types.md`, `README.md`). When you change one, grep for the old number and change them all. Ratios must always sum to 100.
@@ -87,6 +89,7 @@ rm -rf .claude
 | Update an archetype description | `skill/references/brand-archetypes.md` |
 | Add a new `--ai` CLI target | `cli/bin/thoth.js` (the `SKILL_DIR_MAP` object) + `install.sh` case statement + `README.md` |
 | Harden git safety | `skill/references/git-safety.md` |
+| Change where persona data lives (data root, migration, resolution order) | `skill/SKILL.md` ("Where persona data lives" section) + `skill/personas/README.md` + `README.md` (Privacy + persona-location paragraphs) |
 
 ## Non-goals (keep in mind)
 

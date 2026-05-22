@@ -1,15 +1,21 @@
 # Personas
 
-This directory stores one subfolder per user on this Thoth install. Thoth manages these files — don't edit by hand unless you know what you're doing. Use `/thoth edit` instead.
+This directory inside the skill is **a placeholder**. Real persona data lives outside the skill folder so it can be granted read/write access without exposing Claude's own config files.
 
-## Active persona
+## Where your persona data actually lives
 
-`personas/.active` holds a single line with the username of the currently active persona. If absent or empty, no persona is active — commands that need an active user will ask you to activate one.
+Thoth resolves the **data root** at runtime in this order:
+
+1. `./.thoth/personas/` in the current working directory (per-project mode — useful for teams checking personas into a project repo).
+2. `~/.thoth/personas/` (global mode, default).
+3. `~/.claude/skills/thoth/personas/` (legacy mode for pre-v1.1 installs — auto-migrated to `~/.thoth/` on first run after upgrade).
+
+The active persona pointer (a single line with the username) lives at `<data-root>/personas/.active`.
 
 ## Per-user folder layout
 
 ```
-personas/<username>/
+<data-root>/personas/<username>/
 ├── persona.md       # canonical voice doc (written by onboarding, editable)
 ├── topics.md        # pillar topics + expertise areas
 ├── recent.md        # daily inputs, timestamped — what's been on your mind
@@ -19,8 +25,14 @@ personas/<username>/
 └── schedule.txt     # name of any scheduled task (so `/thoth unschedule` can find it)
 ```
 
+Thoth manages these files — don't edit by hand unless you know what you're doing. Use `/thoth edit` instead.
+
+## Migrating from a pre-v1.1 install
+
+If you have personas at `~/.claude/skills/thoth/personas/` from an earlier version, the first `/thoth ...` command after upgrade will offer a one-time `mv` to `~/.thoth/personas/`. Decline if you want to migrate manually; the offer comes back on the next invocation until you accept.
+
 ## Privacy note
 
-Everything in this directory stays local to your Thoth install. Thoth doesn't transmit it anywhere. If you want to back it up, copy the whole folder. If you want to move it to a new machine, copy the folder there and reinstall the skill.
+Everything in the data root stays local. Thoth doesn't transmit it anywhere. To back up: copy `~/.thoth/` (or `./.thoth/` for a project). To migrate machines: copy the data root to the new machine — the skill itself reinstalls cleanly.
 
-If you're on a shared install (team / agency), keep in mind that any user on this install can read any persona — including the anti-voice, contrarian beliefs, and recent inputs. If that's a concern, install Thoth per-user rather than shared.
+If you're on a shared install (team / agency), keep in mind that any user with access to the data root can read any persona — including the anti-voice, contrarian beliefs, and recent inputs. If that's a concern, use per-project mode (`./.thoth/`) inside a directory only your account can read, or install Thoth per-user with a separate home directory.
