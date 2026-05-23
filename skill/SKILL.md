@@ -1,5 +1,6 @@
 ---
 name: thoth
+version: 1.1.2
 description: Build and maintain a unique, consistent LinkedIn voice for one or more users. Runs a framework-driven persona interview (brand archetypes + tone spectrum + hot-take exercises), then generates ready-to-publish LinkedIn posts across a 30/25/20/15/10 content mix (Personal / Work / Thought-leadership / Educational / Promotional). Handles multi-user installs — teams, agencies, or families can share one install with a persona per person. Trigger on any `/thoth` command, on phrases like "write a LinkedIn post", "draft a post for [name]", "help me sound more like myself on LinkedIn", "onboard me on Thoth", "set up my LinkedIn voice", or when the user asks for help building a personal brand / thought leadership on LinkedIn. Also trigger when the user references their own posting cadence, content calendar, or wants to regenerate a post. Use this skill instead of writing a generic LinkedIn post whenever the user has a Thoth persona on file.
 ---
 
@@ -89,6 +90,8 @@ All commands are of the form `/thoth [subcommand] [args...]`. The `<name>` arg a
 | `/thoth schedule [HH:MM]` | Set up a recurring daily prompt via the `schedule` skill. Default 08:30 local time. |
 | `/thoth unschedule` | Cancel the recurring schedule. |
 | `/thoth recover` | Scan past Claude session logs for persona content and restore it to the current data root. Use after an upgrade that wiped your persona data (e.g. `amskills update` from a v1.0.x install). |
+| `/thoth update` | Check for a newer Thoth release and upgrade in place. Persona data is independent of the skill folder — never touched. |
+| `/thoth version` | Print the installed Thoth version and where the skill + data live. |
 
 ### Command dispatch
 
@@ -166,6 +169,46 @@ Use the `schedule` skill to create a recurring task. The scheduled prompt should
 The skill resolves the active persona itself when the scheduled task fires — don't bake a data-root path into the prompt, since the data root is resolved at runtime per the rules in "Where persona data lives."
 
 Default time: 08:30 in the user's local timezone. If the user passes a time, use it. Store the scheduled task name in `personas/<active>/schedule.txt` so `unschedule` can find it.
+
+### `/thoth version` — show installed version + paths
+
+Read the `version:` field from the top of this `SKILL.md` (frontmatter). Resolve the current data root using the rules in "Where persona data lives." Output:
+
+```
+Thoth <version>
+  skill code:  <path to SKILL.md's parent dir>
+  data root:   <resolved data root>
+  personas:    <comma-separated list of persona folders found under data root>
+  active:      <contents of <data-root>/personas/.active or "(none)">
+```
+
+No prompts, no side effects. Pure read.
+
+### `/thoth update` — pull the latest release
+
+This command upgrades Thoth itself in place, without touching persona data. From v1.1.0 onwards persona data lives at `~/.thoth/` (outside the skill folder) so any update path leaves it untouched by construction.
+
+**Dispatch:**
+
+1. Read the installed version from this `SKILL.md`'s `version:` frontmatter. Treat a missing field as `<unknown>`.
+2. Check the latest published version. Try in order:
+   - **GitHub Releases:** `curl -fsSL https://api.github.com/repos/NirvanaGuha/thoth/releases/latest` → parse `tag_name` (strip leading `v`).
+   - **AM Skills info:** `amskills info thoth` if `amskills` is on PATH.
+   Use whichever responds first. Both should agree; if they don't, prefer the higher version.
+3. If installed `==` latest: tell the user *"Thoth is already up to date (v<X.Y.Z>)."* and stop. Don't prompt, don't run anything.
+4. If installed `<` latest: show the current vs. latest, and the release notes (`gh release view v<latest> -R NirvanaGuha/thoth --json body --jq '.body'` if `gh` is available, else skip notes). Ask: *"Update Thoth from v<current> to v<latest>? (yes / no)"*
+5. On `yes`, detect the install source and run the right command. Detection order:
+   - **If `amskills` is on PATH and `amskills info thoth` shows the skill as installed** → run `amskills update thoth`. This is the most common path.
+   - **Else if a `cli/bin/thoth.js` style indicator exists** (e.g. `which thoth` returns a path under a `node_modules` tree, or the user installed via `npx`) → run `npx thoth-skill@latest update`.
+   - **Else (curl / install.sh path)** → re-run the install one-liner: `curl -fsSL https://raw.githubusercontent.com/NirvanaGuha/thoth/main/install.sh | THOTH_REF=v<latest> bash`. The install.sh's pre-install legacy-rescue logic will handle any leftover legacy personas.
+6. After the update command exits, re-read this `SKILL.md`'s `version:` frontmatter to confirm the bump. If it didn't change, surface the update-command output so the user can see what went wrong.
+7. Confirm: *"Thoth is now at v<new>. Your persona data at `<data-root>/personas/` was not touched."*
+
+**Hard rules for this command:**
+
+- **Never** delete, move, or modify anything under the resolved data root. The update path is a skill-only operation.
+- **Never** run the update command without explicit user confirmation. Even if the user has blanket-approved Bash, the version bump is a state change worth seeing.
+- **Never** invoke `git pull`, `git clone`, or any direct repo manipulation inside `~/.claude/skills/thoth/` — the installed skill is a snapshot, not a working copy.
 
 ### `/thoth recover` — restore personas wiped by an install update
 

@@ -203,6 +203,8 @@ After installing, in Claude:
 | `/thoth schedule [HH:MM]` | Automate the daily flow via the `schedule` skill. |
 | `/thoth unschedule` | Cancel the recurring schedule. |
 | `/thoth recover` | Restore personas from past Claude session logs after an upgrade wiped your data. |
+| `/thoth update` | Check for a newer Thoth release and upgrade in place. Persona data is not touched. |
+| `/thoth version` | Print the installed Thoth version and where the skill + data live. |
 
 ---
 
