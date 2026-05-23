@@ -27,6 +27,7 @@ Commands:
 - `/thoth recover` — restore persona data from past Claude session logs (use after an upgrade that wiped your data, e.g. `amskills update` from v1.0.x).
 - `/thoth update` — check for a newer release and upgrade in place. Persona data is never touched.
 - `/thoth version` — print installed version, skill path, and data root.
+- `/thoth frameworks` — browse the 20-framework catalog and 13-hook library. `/thoth frameworks <name>` for a single framework's full spec.
 
 Output is always copy-ready LinkedIn post text. Thoth never posts on your behalf.
 

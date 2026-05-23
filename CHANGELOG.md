@@ -2,6 +2,26 @@
 
 All notable changes to Thoth are documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] — 2026-05-24
+
+### Added
+- **Framework catalog.** 20 named writing frameworks (4 per post type) at full schema — origin, shape, must-have/must-not-have, anti-pattern, worked spine, skip-when. Lives in restructured `skill/references/post-types.md`.
+  - Personal: `quiet-reveal` ★, `then-now-because`, `the-confession`, `gratitude-specific`.
+  - Work: `decision-log` ★, `failed-experiment`, `constraint-driven-story`, `pre-mortem`.
+  - Thought-leadership: `heretical-claim-receipts-stake` ★, `first-principles-reframe`, `steel-man-then-dismantle`, `changed-my-mind`.
+  - Educational: `pmrg` ★, `anti-pattern-catalog`, `curse-of-knowledge-unwind`, `cookbook`.
+  - Promotional: `story-first-promo` ★, `i-built-this-because`, `receipt-stack-soft-ask`, `anti-launch`.
+- **Hook pattern library.** New file `skill/references/hook-patterns.md` with 13 named hook patterns and a per-type compatibility matrix. Hooks compose independently of frameworks; the generator picks one of each per post.
+- **`/thoth frameworks` command.** Read-only catalog browser. `/thoth frameworks` lists the catalog; `/thoth frameworks <name>` shows a single framework's full spec; `/thoth frameworks hooks` lists the hook library; `/thoth frameworks hooks <name>` shows a single hook's spec.
+- **Selection algorithm** in `content-mix.md` extended to type → framework → hook → topic, each with rotation windows and archetype/topic fit filters.
+- **`history.yaml`** schema gains `framework` and `hook_pattern` fields per post. Older rows without these fields are treated as `unknown` and excluded from rotation filters.
+- **Voice check** gains two items in v1.2.0: confirm the draft follows the chosen framework's shape (not a generic Classic arc), and confirm the opener matches the chosen hook pattern.
+
+### Changed
+- `skill/references/post-types.md` restructured from one template-per-type into a 4-framework catalog per type (~1,400 lines). Previous Must-have / Must-not-have / Length-target guidance preserved.
+- `skill/references/content-mix.md` "How Thoth picks the next type" section expanded into a four-step "Selection algorithm" covering type, framework, hook, and topic selection.
+- `skill/SKILL.md` `/thoth` (generate post) dispatch updated to call out type → framework → hook → topic ordering with explicit announce-before-drafting.
+
 ## [1.1.3] — 2026-05-23
 
 ### Added
@@ -68,6 +88,7 @@ Upgrading from v1.0.x via `amskills update thoth` destroys legacy persona data a
 - Daily flow (`/thoth daily`) and scheduled prompts (`/thoth schedule`).
 - npx, curl, and AM Skills install paths.
 
+[1.2.0]: https://github.com/NirvanaGuha/thoth/releases/tag/v1.2.0
 [1.1.3]: https://github.com/NirvanaGuha/thoth/releases/tag/v1.1.3
 [1.1.2]: https://github.com/NirvanaGuha/thoth/releases/tag/v1.1.2
 [1.1.1]: https://github.com/NirvanaGuha/thoth/releases/tag/v1.1.1

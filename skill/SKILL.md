@@ -1,6 +1,6 @@
 ---
 name: thoth
-version: 1.1.3
+version: 1.2.0
 description: Build and maintain a unique, consistent LinkedIn voice for one or more users. Runs a framework-driven persona interview (brand archetypes + tone spectrum + hot-take exercises), then generates ready-to-publish LinkedIn posts across a 30/25/20/15/10 content mix (Personal / Work / Thought-leadership / Educational / Promotional). Handles multi-user installs — teams, agencies, or families can share one install with a persona per person. Trigger on any `/thoth` command, on phrases like "write a LinkedIn post", "draft a post for [name]", "help me sound more like myself on LinkedIn", "onboard me on Thoth", "set up my LinkedIn voice", or when the user asks for help building a personal brand / thought leadership on LinkedIn. Also trigger when the user references their own posting cadence, content calendar, or wants to regenerate a post. Use this skill instead of writing a generic LinkedIn post whenever the user has a Thoth persona on file.
 ---
 
@@ -92,6 +92,7 @@ All commands are of the form `/thoth [subcommand] [args...]`. The `<name>` arg a
 | `/thoth recover` | Scan past Claude session logs for persona content and restore it to the current data root. Use after an upgrade that wiped your persona data (e.g. `amskills update` from a v1.0.x install). |
 | `/thoth update` | Check for a newer Thoth release and upgrade in place. Persona data is independent of the skill folder — never touched. |
 | `/thoth version` | Print the installed Thoth version and where the skill + data live. |
+| `/thoth frameworks` | Browse the framework catalog (20 frameworks across the 5 post types) and the hook-pattern library. Read-only. |
 
 ### Command dispatch
 
@@ -116,16 +117,26 @@ Read `references/onboarding-interview.md` in full. Follow it **end-to-end withou
 
 ### `/thoth` (generate a post)
 
-1. Read `personas/<active>/persona.md`, `history.yaml`, and `topics.md`.
-2. Determine the **next post type** using the ratio rules in `references/content-mix.md`. Output which type you picked and why in one sentence.
-3. Pick a **topic** — rotate through the pillar topics in `topics.md`, integrate any recent inputs in `recent.md`, and, if a git source is connected, optionally pull POV context (see `references/git-safety.md` — absolutely no repo/code promotion).
-4. Draft the post using the voice in `persona.md` and the story-arc rules in `references/story-arcs.md`. Follow the relevant post-type template in `references/post-types.md`.
-5. Run the **voice check** (see below) before emitting.
-6. Output **only** the post text, with a final one-line meta footer:
+Selection runs in four ordered steps before drafting begins. The full algorithm with rotation windows and tie-breakers is in `references/content-mix.md` ("Selection algorithm"). Summary:
+
+1. Read `personas/<active>/persona.md`, `history.yaml`, `topics.md`, and `recent.md`.
+2. **Pick the type** using the ratio rules in `references/content-mix.md`.
+3. **Pick the framework** — open `references/post-types.md` for the chosen type, filter the 4-framework catalog by last-4-used (rotation) and archetype/topic fit (from each framework's `Skip when` clauses), pick the strongest match. User can force one with `--framework <name>`.
+4. **Pick the hook pattern** — read the chosen framework's `Compatible hooks` list, filter against `references/hook-patterns.md` for last-3-used and archetype fit, pick one. User can force one with `--hook <name>`.
+5. **Pick the topic** — rotate pillar topics from `topics.md`, integrate any recent inputs in `recent.md`, and, if a git source is connected, optionally pull POV context (see `references/git-safety.md` — absolutely no repo/code promotion).
+6. **Announce the picks** in one paragraph before drafting:
+   > *"Today: Thought-leadership (10pp under target). Framework: `heretical-claim-receipts-stake` (5 posts since last used). Hook: `inverted-truism`. Topic: AI workflows vs prompt training. Drafting now."*
+7. **Draft the post** using:
+   - The voice in `persona.md`.
+   - The framework's `Shape` block from `post-types.md`.
+   - The framework's default arc from `story-arcs.md`.
+   - The hook pattern's `Shape` block from `hook-patterns.md`.
+8. **Run the voice check** (see below) before emitting. One extra item in v1.2.0: *"Does the draft actually follow the chosen framework's shape, or did it slide into a generic Classic arc?"*
+9. **Output** only the post text, with a final one-line meta footer:
    ```
-   — type: <type> • topic: <short> • ~<wordcount> words
+   — type: <type> • framework: <framework> • hook: <hook> • topic: <short> • ~<wordcount> words
    ```
-7. Append an entry to `history.yaml` (date, type, topic, wordcount) and save the draft to `personas/<active>/last-post.md` for regenerate.
+10. **Log** the new row to `history.yaml` with `date`, `type`, `framework`, `hook_pattern`, `topic`, `wordcount`, and save the draft to `personas/<active>/last-post.md` for regenerate.
 
 ### `/thoth daily`
 
@@ -169,6 +180,42 @@ Use the `schedule` skill to create a recurring task. The scheduled prompt should
 The skill resolves the active persona itself when the scheduled task fires — don't bake a data-root path into the prompt, since the data root is resolved at runtime per the rules in "Where persona data lives."
 
 Default time: 08:30 in the user's local timezone. If the user passes a time, use it. Store the scheduled task name in `personas/<active>/schedule.txt` so `unschedule` can find it.
+
+### `/thoth frameworks` — browse the catalog
+
+Read-only. Lists the framework catalog from `references/post-types.md` and the hook library from `references/hook-patterns.md`. Used when the user wants to choose a framework manually or just understand what's available.
+
+**No arguments:**
+Show a compact table — for each post type, list the 4 frameworks with their one-line origin/description and which is the `★` default.
+
+```
+PERSONAL (30%)
+  ★ quiet-reveal           Scene → texture → small turn → quiet landing.
+    then-now-because       Specific past → specific present → mechanism.
+    the-confession         Admit being wrong about X for Y years.
+    gratitude-specific     One person, one moment, one thing they did.
+
+WORK (25%)
+  ★ decision-log           Options considered, choice, risk, result.
+    failed-experiment      Bet, hypothesis, what happened, what we missed.
+    constraint-driven-story  Constraint, what it forced, what we cut.
+    pre-mortem             Imagine it failed — name and mitigate risks.
+
+[…]
+
+Hook patterns: see `/thoth frameworks hooks` or `references/hook-patterns.md`.
+```
+
+**`/thoth frameworks <name>`:**
+Show the full spec for that framework — origin, shape, must-have, must-not-have, anti-pattern, worked spine, skip-when. Pulled directly from `references/post-types.md`.
+
+**`/thoth frameworks hooks`:**
+Render the 13-row compatibility matrix from `references/hook-patterns.md`. No spec details — point the user to the file for full specs.
+
+**`/thoth frameworks hooks <name>`:**
+Full hook-pattern spec from `references/hook-patterns.md`.
+
+No side effects. Never modifies `history.yaml` or any persona file.
 
 ### `/thoth version` — show installed version + paths
 
@@ -243,6 +290,8 @@ Before emitting any generated post, silently verify:
 - [ ] At least one specific, concrete detail (a number, a scene, a name, a micro-observation) — no generic "thought leadership" fog.
 - [ ] Any voices listed under `anti_voice` in `persona.md` are explicitly avoided.
 - [ ] Length matches the post-type target in `references/post-types.md`.
+- [ ] **The draft actually follows the chosen framework's `Shape` block** — not a generic Classic arc in framework clothing. If beats are missing or compressed beyond recognition, rewrite. *(v1.2.0+)*
+- [ ] **The opener matches the chosen hook pattern** from `references/hook-patterns.md`. If the hook drifted to a different pattern during drafting, either update the hook in the meta footer or rewrite the opener. *(v1.2.0+)*
 - [ ] ≤ 4 hashtags, all relevant. No tagging for engagement bait.
 - [ ] If a git source was used, run the **redaction check** in `references/git-safety.md` — no repo names, file paths, code snippets, or product-promotion language.
 - [ ] For Promotional type only: the post is still primarily useful/interesting — the promotional ask is the close, not the substance.
@@ -263,9 +312,10 @@ If any check fails, silently rewrite and re-check. Only output when all pass.
 │   ├── brand-archetypes.md          # 12 Jungian archetypes
 │   ├── tone-spectrum.md             # NN 4-dimensional tone model
 │   ├── hot-take-exercises.md        # anti-voice & contrarian-belief prompts
-│   ├── content-mix.md               # 30/25/20/15/10 rules + ratio tracker
-│   ├── post-types.md                # type-by-type templates with examples
-│   ├── story-arcs.md                # hook/context/insight/resolution/close
+│   ├── content-mix.md               # 30/25/20/15/10 rules + full selection algorithm
+│   ├── post-types.md                # per-type framework catalog (20 frameworks)
+│   ├── hook-patterns.md             # 13 named hook patterns with compatibility matrix
+│   ├── story-arcs.md                # universal post arcs (Classic, Frame-Break, Quiet Reveal)
 │   ├── git-safety.md                # strict rules for git POV source
 │   ├── example-posts.md             # cross-archetype voice calibration
 │   ├── persona-template.md          # the skeleton persona.md

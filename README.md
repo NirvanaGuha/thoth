@@ -17,6 +17,13 @@ Named after the Egyptian god of writing, who weighed hearts against the feather 
 
 ---
 
+## What's new in v1.2
+
+- **Framework catalog** — 20 named writing frameworks (4 per post type) replacing the previous one-template-per-type model. Each framework has a documented origin, shape, must-have rules, anti-pattern, and worked spine. Examples: `heretical-claim-receipts-stake` (thought-leadership), `decision-log` (work), `quiet-reveal` (personal), `pmrg` (educational), `story-first-promo` (promotional).
+- **Hook pattern library** — 13 named hook patterns (`inverted-truism`, `micro-confession`, `constraint-reveal`, etc.) composable with any framework, rotated across recent posts.
+- **`/thoth frameworks`** — browse the catalog from inside Claude. `/thoth frameworks <name>` shows a single framework's full spec; `/thoth frameworks hooks` lists the hook compatibility matrix.
+- **Smarter generation** — every post now picks type → framework → hook → topic with explicit rotation windows. Thoth announces the picks before drafting so you can interrupt.
+
 ## What's new in v1.1
 
 - **`/thoth update`** — upgrade Thoth in place from inside Claude. Detects how you installed (AM Skills / npx / curl) and runs the right update command. Persona data is never touched.
@@ -218,6 +225,7 @@ After installing, in Claude:
 | `/thoth recover` | Restore personas from past Claude session logs after an upgrade wiped your data. |
 | `/thoth update` | Check for a newer Thoth release and upgrade in place. Persona data is not touched. |
 | `/thoth version` | Print the installed Thoth version and where the skill + data live. |
+| `/thoth frameworks` | Browse the framework catalog (20 frameworks × 5 post types) and the 13-pattern hook library. `/thoth frameworks <name>` for a single framework's full spec. |
 
 ---
 
@@ -408,7 +416,8 @@ To back up: copy `~/.thoth/`. To migrate machines: copy `~/.thoth/` to the new i
 
 Full version history is in [CHANGELOG.md](./CHANGELOG.md). Recent highlights:
 
-- **v1.1.3** — Ship this `CHANGELOG.md`; add "What's new" highlights to the README.
+- **v1.2.0** — Framework catalog (20 frameworks across 5 types) + hook pattern library (13 patterns) + `/thoth frameworks` command. Every generated post now picks a named framework and hook with rotation.
+- **v1.1.3** — Ship `CHANGELOG.md`; add "What's new" highlights to the README.
 - **v1.1.2** — `/thoth update` and `/thoth version` commands.
 - **v1.1.1** — `/thoth recover`; install-time legacy-persona rescue for `install.sh` and `npx`.
 - **v1.1.0** — Persona data relocated to `~/.thoth/` (outside the skill folder).
