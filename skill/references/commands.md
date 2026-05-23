@@ -24,6 +24,7 @@ Commands:
 - `/thoth disconnect git <path>` — remove a git source.
 - `/thoth schedule [HH:MM]` — schedule recurring daily prompt (default 08:30 local).
 - `/thoth unschedule` — cancel the recurring schedule.
+- `/thoth recover` — restore persona data from past Claude session logs (use after an upgrade that wiped your data, e.g. `amskills update` from v1.0.x).
 
 Output is always copy-ready LinkedIn post text. Thoth never posts on your behalf.
 

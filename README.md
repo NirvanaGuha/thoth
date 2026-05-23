@@ -202,6 +202,7 @@ After installing, in Claude:
 | `/thoth disconnect git <path>` | Remove a git source. |
 | `/thoth schedule [HH:MM]` | Automate the daily flow via the `schedule` skill. |
 | `/thoth unschedule` | Cancel the recurring schedule. |
+| `/thoth recover` | Restore personas from past Claude session logs after an upgrade wiped your data. |
 
 ---
 

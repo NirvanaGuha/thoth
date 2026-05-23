@@ -47,6 +47,29 @@ echo "  ref:    $REF"
 echo "  target: $TARGET"
 echo
 
+# Pre-install: rescue legacy persona data if the user had v1.0.x installed.
+# v1.1+ stores persona data at ~/.thoth/ (outside the skill folder), but earlier
+# versions kept it inside the skill at $TARGET/personas/. A reinstall would
+# destroy it — so move it out of harm's way before we touch $TARGET.
+LEGACY_PERSONAS="$TARGET/personas"
+NEW_DATA_ROOT="$HOME/.thoth"
+if [ -d "$LEGACY_PERSONAS" ]; then
+  # Heuristic: legacy data is present if there's a persona subfolder beyond just
+  # README.md / .active / the v1.1 placeholder structure.
+  HAS_USER_DATA=0
+  for entry in "$LEGACY_PERSONAS"/*/; do
+    [ -d "$entry" ] && HAS_USER_DATA=1 && break
+  done
+  if [ "$HAS_USER_DATA" = "1" ] && [ ! -d "$NEW_DATA_ROOT/personas" ]; then
+    echo "  found legacy persona data at $LEGACY_PERSONAS"
+    echo "  migrating to $NEW_DATA_ROOT/personas/ before reinstall…"
+    mkdir -p "$NEW_DATA_ROOT"
+    mv "$LEGACY_PERSONAS" "$NEW_DATA_ROOT/personas"
+    echo "  ✓ migrated."
+    echo
+  fi
+fi
+
 if [ -d "$TARGET" ]; then
   echo "  $TARGET already exists."
   echo "  Remove it first, or set THOTH_SCOPE=local for a project-local install."

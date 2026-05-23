@@ -88,6 +88,7 @@ All commands are of the form `/thoth [subcommand] [args...]`. The `<name>` arg a
 | `/thoth disconnect git <path>` | Remove a git source. |
 | `/thoth schedule [HH:MM]` | Set up a recurring daily prompt via the `schedule` skill. Default 08:30 local time. |
 | `/thoth unschedule` | Cancel the recurring schedule. |
+| `/thoth recover` | Scan past Claude session logs for persona content and restore it to the current data root. Use after an upgrade that wiped your persona data (e.g. `amskills update` from a v1.0.x install). |
 
 ### Command dispatch
 
@@ -165,6 +166,27 @@ Use the `schedule` skill to create a recurring task. The scheduled prompt should
 The skill resolves the active persona itself when the scheduled task fires — don't bake a data-root path into the prompt, since the data root is resolved at runtime per the rules in "Where persona data lives."
 
 Default time: 08:30 in the user's local timezone. If the user passes a time, use it. Store the scheduled task name in `personas/<active>/schedule.txt` so `unschedule` can find it.
+
+### `/thoth recover` — restore personas wiped by an install update
+
+This command exists for one specific failure mode: a user had personas at `~/.claude/skills/thoth/personas/` under v1.0.x, then upgraded to v1.1.x via an install path that doesn't preserve persona data (notably `amskills update`, which replaces the skill folder wholesale). The migration logic in "Where persona data lives" can't help when the legacy data was destroyed *before* the new SKILL.md was ever read.
+
+Recovery scans past Claude Code session JSONL logs at `~/.claude/projects/**/*.jsonl` for `Read` / `Write` / `Edit` tool calls that touched persona files, reconstructs the most recent state of each file, and writes the result into the current data root.
+
+**Dispatch:**
+
+1. Resolve the data root using the normal rules.
+2. Run the bundled recovery script: `node ~/.claude/skills/thoth/scripts/recover.js --target <data-root>`
+   - The script will scan, list what it finds, and prompt before writing.
+   - If the user passes `--dry-run`, append it to the command.
+   - If the user passes `--apply`, append it to skip the prompt.
+3. Pass the script's output through to the user verbatim. If the script writes a `.active` file, confirm which persona is now active.
+4. After recovery, advise: *"Open one of the recovered files to sanity-check the content. The script reconstructs from past session logs, so files Claude never read or wrote will not be recoverable."*
+
+**When NOT to use:**
+- Fresh installs (nothing to recover).
+- When the legacy `~/.claude/skills/thoth/personas/` is still intact — use the standard migration instead.
+- After a recent `/thoth recover` already populated the data root.
 
 ---
 

@@ -160,10 +160,36 @@ function untarGz(buf, destRoot) {
 // ---------------------------------------------------------------------------
 // Commands
 // ---------------------------------------------------------------------------
+// Pre-install: rescue legacy persona data from inside the skill folder.
+// v1.1+ stores persona data at ~/.thoth/ (outside the skill folder), but
+// earlier versions kept it inside the skill at <target>/personas/. A reinstall
+// or update would destroy it — so move it out before touching the target.
+function rescueLegacyPersonas(target) {
+  const legacy = path.join(target, 'personas');
+  const newRoot = path.join(os.homedir(), '.thoth');
+  const newPersonas = path.join(newRoot, 'personas');
+
+  if (!fs.existsSync(legacy)) return;
+  if (fs.existsSync(newPersonas)) return; // already migrated, leave legacy alone
+
+  // Heuristic: any subdirectory under personas/ is user data (vs. README.md / .active).
+  const entries = fs.readdirSync(legacy, { withFileTypes: true });
+  const hasUserData = entries.some((e) => e.isDirectory());
+  if (!hasUserData) return;
+
+  console.log(yellow(`  found legacy persona data at ${legacy}`));
+  console.log(`  migrating to ${cyan(newPersonas)} before reinstall…`);
+  fs.mkdirSync(newRoot, { recursive: true });
+  fs.renameSync(legacy, newPersonas);
+  console.log(green(`  ✓ migrated.\n`));
+}
+
 async function cmdInit(flags) {
   const target = resolveTarget(flags);
   console.log(`${bold('Thoth')} ${dim('v' + VERSION)}`);
   console.log(`Installing to ${cyan(target)}`);
+
+  rescueLegacyPersonas(target);
 
   if (fs.existsSync(target) && !flags.force) {
     console.log(yellow(`\n  ${target} already exists.`));
@@ -203,16 +229,27 @@ function cmdUninstall(flags) {
     console.log(yellow(`Nothing installed at ${target}.`));
     return;
   }
-  const hasPersonas = fs.existsSync(path.join(target, 'personas')) &&
-    fs.readdirSync(path.join(target, 'personas')).some((n) => n !== 'README.md' && n !== '.active');
-  if (hasPersonas && !flags.force) {
-    console.log(yellow(`\n  Personas detected at ${target}/personas/.`));
-    console.log(`  These contain your voice data and post history.`);
-    console.log(`  Re-run with ${bold('--force')} to wipe them, or copy ${cyan(path.join(target, 'personas'))} out first.\n`);
+  // v1.0.x personas-in-skill safety: warn if there's still user data inside
+  // the skill folder (shouldn't happen after a normal upgrade, but possible
+  // if the user installed v1.0.x and never invoked Thoth on v1.1+).
+  const inSkillPersonas = path.join(target, 'personas');
+  const hasUserDataInSkill = fs.existsSync(inSkillPersonas) &&
+    fs.readdirSync(inSkillPersonas, { withFileTypes: true }).some((e) => e.isDirectory());
+  if (hasUserDataInSkill && !flags.force) {
+    console.log(yellow(`\n  Legacy persona data detected inside the skill at ${inSkillPersonas}.`));
+    console.log(`  v1.1+ stores persona data at ${cyan('~/.thoth/personas/')} (outside the skill).`);
+    console.log(`  Run ${bold('thoth update')} first to migrate it, then re-run uninstall.`);
+    console.log(`  Or pass ${bold('--force')} to wipe the legacy data anyway.\n`);
     process.exit(1);
   }
   rmRecursive(target);
-  console.log(green(`\n  ✓ Removed ${target}.`));
+  const newRootPersonas = path.join(os.homedir(), '.thoth', 'personas');
+  if (fs.existsSync(newRootPersonas)) {
+    console.log(green(`\n  ✓ Removed ${target}.`));
+    console.log(dim(`  Your persona data at ${newRootPersonas} was not touched. Delete it manually if you also want that gone.`));
+  } else {
+    console.log(green(`\n  ✓ Removed ${target}.`));
+  }
 }
 
 async function cmdUpdate(flags) {
@@ -221,22 +258,13 @@ async function cmdUpdate(flags) {
     console.log(yellow(`No existing install at ${target}. Run ${bold('thoth init')} first.`));
     return;
   }
-  // Preserve personas/ across update.
-  const personasSrc = path.join(target, 'personas');
-  const personasBackup = path.join(os.tmpdir(), `thoth-personas-${Date.now()}`);
-  let hasPersonas = false;
-  if (fs.existsSync(personasSrc)) {
-    copyRecursive(personasSrc, personasBackup);
-    hasPersonas = true;
-  }
+  // v1.1+ stores persona data outside the skill folder (~/.thoth/), so
+  // ordinary updates do not need to preserve anything inside the skill.
+  // rescueLegacyPersonas (called from cmdInit) handles the one-time migration
+  // for users still on v1.0.x at update time.
   rmRecursive(target);
   await cmdInit({ ...flags, force: true });
-  if (hasPersonas) {
-    rmRecursive(path.join(target, 'personas'));
-    copyRecursive(personasBackup, path.join(target, 'personas'));
-    rmRecursive(personasBackup);
-    console.log(green('  ✓ Preserved your personas/ folder.'));
-  }
+  console.log(green('  ✓ Update complete. Your persona data at ~/.thoth/ was untouched.'));
 }
 
 async function cmdVersions() {
@@ -273,13 +301,35 @@ function cmdList(flags) {
   }
   console.log(bold('Thoth installs:'));
   for (const p of found) {
-    const personasDir = path.join(p, 'personas');
-    const personas = fs.existsSync(personasDir)
-      ? fs.readdirSync(personasDir).filter((n) => n !== '.active' && n !== 'README.md' && !n.startsWith('.'))
-      : [];
     console.log(`  ${cyan(p)}`);
-    console.log(`    personas: ${personas.length ? personas.join(', ') : dim('(none yet)')}`);
   }
+  // Resolve the data root (per the rules in SKILL.md) and list personas there.
+  const localData = path.join(process.cwd(), '.thoth', 'personas');
+  const homeData = path.join(os.homedir(), '.thoth', 'personas');
+  const legacy = found.map((p) => path.join(p, 'personas')).find((p) =>
+    fs.existsSync(p) && fs.readdirSync(p, { withFileTypes: true }).some((e) => e.isDirectory())
+  );
+  let dataRoot = null;
+  if (fs.existsSync(localData)) dataRoot = localData;
+  else if (fs.existsSync(homeData)) dataRoot = homeData;
+  else if (legacy) dataRoot = legacy;
+
+  console.log();
+  if (!dataRoot) {
+    console.log(`${bold('Personas:')} ${dim('(none yet — run `/thoth <your-name>` in Claude to create one)')}`);
+    return;
+  }
+  const personas = fs.readdirSync(dataRoot, { withFileTypes: true })
+    .filter((e) => e.isDirectory()).map((e) => e.name);
+  let active = '';
+  const activePath = path.join(dataRoot, '.active');
+  if (fs.existsSync(activePath)) active = fs.readFileSync(activePath, 'utf8').trim();
+  console.log(`${bold('Personas')} ${dim(`(data root: ${dataRoot})`)}`);
+  for (const p of personas) {
+    const marker = p === active ? green(' *') : '';
+    console.log(`  ${cyan(p)}${marker}`);
+  }
+  if (active) console.log(`  ${dim('* = active')}`);
 }
 
 function cmdHelp() {
@@ -291,8 +341,8 @@ ${bold('Usage:')}
 
 ${bold('Commands:')}
   ${cyan('init')}                   Install the skill (default: ~/.claude/skills/thoth)
-  ${cyan('update')}                 Pull the latest release, preserving your personas/
-  ${cyan('uninstall')}              Remove the skill (prompts if personas/ exist)
+  ${cyan('update')}                 Pull the latest release (persona data at ~/.thoth/ is untouched)
+  ${cyan('uninstall')}              Remove the skill (persona data at ~/.thoth/ is kept)
   ${cyan('versions')}               List released versions
   ${cyan('list')}                   Show where Thoth is installed and which personas exist
   ${cyan('help')}                   Print this message
@@ -303,7 +353,7 @@ ${bold('Options for init / update / uninstall:')}
                           instead of the user home directory
   ${cyan('--offline')}              Use the assets bundled in the npm package
                           (no GitHub fetch). Useful on air-gapped machines.
-  ${cyan('--force')}                Overwrite existing install / wipe personas on uninstall
+  ${cyan('--force')}                Overwrite existing install / ignore legacy persona warnings
 
 ${bold('Examples:')}
   ${dim('# simplest install (user-global)')}
