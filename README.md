@@ -17,6 +17,19 @@ Named after the Egyptian god of writing, who weighed hearts against the feather 
 
 ---
 
+## What's new in v1.1
+
+- **`/thoth update`** — upgrade Thoth in place from inside Claude. Detects how you installed (AM Skills / npx / curl) and runs the right update command. Persona data is never touched.
+- **`/thoth version`** — print the installed version, the skill path, and where your persona data lives.
+- **`/thoth recover`** — restore persona data from past Claude session logs. Use after an upgrade that wiped your data (relevant only for `amskills update` from a v1.0.x install).
+- **Persona data moved out of the skill folder.** Lives at `~/.thoth/` (global) or `./.thoth/` (per-project), independent of `~/.claude/skills/thoth/`. You can grant blanket read/write on your data without exposing Claude's own settings.
+
+> ⚠️ **v1.0.x users upgrading via `amskills update`:** v1.1.0 had a known data-loss issue on this specific upgrade path. **Update to v1.1.1 or later and run `/thoth recover`** to reconstruct your personas from session logs. Full details in [CHANGELOG.md](./CHANGELOG.md).
+
+See [CHANGELOG.md](./CHANGELOG.md) for the full release history.
+
+---
+
 ## What Thoth actually does
 
 ```
@@ -388,6 +401,21 @@ If the draft trips any rule, Thoth rewrites. If it can't rewrite to pass, it tel
 Everything stays on your machine. Thoth writes to `~/.thoth/personas/` (or `./.thoth/personas/` in a project that opts into local mode) and nowhere else. It does not transmit persona data, post history, or inputs anywhere. No telemetry.
 
 To back up: copy `~/.thoth/`. To migrate machines: copy `~/.thoth/` to the new install. The skill code itself at `~/.claude/skills/thoth/` is reinstalled cleanly on the new machine — only the data root needs copying.
+
+---
+
+## Changelog
+
+Full version history is in [CHANGELOG.md](./CHANGELOG.md). Recent highlights:
+
+- **v1.1.3** — Ship this `CHANGELOG.md`; add "What's new" highlights to the README.
+- **v1.1.2** — `/thoth update` and `/thoth version` commands.
+- **v1.1.1** — `/thoth recover`; install-time legacy-persona rescue for `install.sh` and `npx`.
+- **v1.1.0** — Persona data relocated to `~/.thoth/` (outside the skill folder).
+- **v1.0.3** — Skip pax/long-name tar headers in the CLI installer.
+- **v1.0.0** — Initial release.
+
+To upgrade an existing install, just run `/thoth update` from inside Claude.
 
 ---
 
