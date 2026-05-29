@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<!--
+  Thoth single-image template: stat-card
+  Best for: a single striking number from a post — research, result, scale.
+  Content fields (from render.js):
+    stat           required   the number itself (e.g. "73%", "12B", "4.2x")
+    caption        required   what the number describes (target 6–14 words)
+    context        optional   secondary line — source / qualifier (target 4–10 words)
+    eyebrow        optional   small caption above stat
+    attribution    optional   default: {{handle}}
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <style>{{tokens_css}}{{base_css}}
+    .stat-display {
+      color: var(--brand-accent);
+      margin-bottom: var(--space-3);
+    }
+    .stat-caption {
+      max-width: 900px;
+    }
+    .stat-context {
+      margin-top: var(--space-4);
+      color: var(--brand-muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="canvas">
+    <header class="canvas-header">
+      {{#eyebrow}}<span class="text-caption">{{eyebrow}}</span>{{/eyebrow}}
+      <span class="accent-dot"></span>
+    </header>
+
+    <main style="flex: 1; display: flex; flex-direction: column; justify-content: center;">
+      <p class="text-display stat-display">{{stat}}</p>
+      <p class="text-headline-sm stat-caption">{{caption}}</p>
+      {{#context}}<p class="text-body stat-context">{{context}}</p>{{/context}}
+    </main>
+
+    <footer class="canvas-footer">
+      <span class="handle">{{attribution}}</span>
+      <span>{{type_label}}</span>
+    </footer>
+  </div>
+</body>
+</html>

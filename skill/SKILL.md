@@ -1,6 +1,6 @@
 ---
 name: thoth
-version: 1.3.0
+version: 1.4.0
 description: Build and maintain a unique, consistent LinkedIn voice for one or more users. Runs a framework-driven persona interview (brand archetypes + tone spectrum + hot-take exercises), then generates ready-to-publish LinkedIn posts across a 30/25/20/15/10 content mix (Personal / Work / Thought-leadership / Educational / Promotional). Handles multi-user installs — teams, agencies, or families can share one install with a persona per person. Trigger on any `/thoth` command, on phrases like "write a LinkedIn post", "draft a post for [name]", "help me sound more like myself on LinkedIn", "onboard me on Thoth", "set up my LinkedIn voice", or when the user asks for help building a personal brand / thought leadership on LinkedIn. Also trigger when the user references their own posting cadence, content calendar, or wants to regenerate a post. Use this skill instead of writing a generic LinkedIn post whenever the user has a Thoth persona on file.
 ---
 
@@ -90,6 +90,8 @@ All commands are of the form `/thoth [subcommand] [args...]`. The `<name>` arg a
 | `/thoth schedule [HH:MM]` | Set up a recurring daily run that writes a draft to `inbox/` and pings the user. Default 08:30 local time. |
 | `/thoth unschedule` | Cancel the recurring schedule. |
 | `/thoth inbox` | List drafts produced by scheduled runs that are awaiting review. `/thoth inbox <date>` opens a specific one; `/thoth inbox accept` / `reject` / `regenerate` handles a draft. |
+| `/thoth image [<date>] [--variant <name>]` | Render the post as a single 1200×1200 PNG. Auto-picks variant from content; override with `--variant quote\|stat\|headline`. Output to `<data-root>/exports/`. |
+| `/thoth brand` | View / edit the active persona's visual identity (`brand.yaml`). First run walks a 2-minute interview with sensible defaults. |
 | `/thoth recover` | Scan past Claude session logs for persona content and restore it to the current data root. Use after an upgrade that wiped your persona data (e.g. `amskills update` from a v1.0.x install). |
 | `/thoth update` | Check for a newer Thoth release and upgrade in place. Persona data is independent of the skill folder — never touched. |
 | `/thoth version` | Print the installed Thoth version and where the skill + data live. |
@@ -316,6 +318,119 @@ After listing, clear `<data-root>/inbox/_unread`.
 1. Archive all `accepted` or `rejected` drafts older than 30 days into `<data-root>/inbox/archive/YYYY-MM/`.
 2. Don't touch `pending-review` drafts regardless of age — those are still waiting on the user.
 
+### `/thoth image [<date>] [--variant <name>]` — render a single image
+
+Renders a 1200×1200 PNG from a post draft. Square aspect ratio (LinkedIn-friendly). Uses `skill/scripts/render.js` (Puppeteer-core + system Chrome).
+
+**Resolve the source draft:**
+
+1. If `<date>` is provided → read `<data-root>/inbox/<date>.md` (frontmatter + body).
+2. Else → read `<data-root>/personas/<active>/last-post.md`.
+3. If neither exists, tell the user and stop.
+
+**Pick the variant** unless `--variant` was passed:
+
+| Source content signal | Variant |
+|---|---|
+| Draft contains a striking number with a clear claim attached (e.g. "3×", "73%", "$1.4M") | `stat-card` |
+| Draft opens with a strong claim that can be compressed to ≤120 chars | `headline-card` |
+| Draft contains a pull-quote-worthy line (high signal, 80–180 chars, stands alone) | `quote-card` |
+| Default fallback | `headline-card` |
+
+**Extract content for the chosen variant.** This is the interesting step — the framework already gives you the shape:
+
+- **headline-card:** the framework's first beat ("Claim" for thought-leadership, "Hook" for personal, "Decision" for work, etc.). Compress to ≤120 chars without losing the conviction. The optional `subhead` is the second beat compressed to a line.
+- **quote-card:** find the most quotable line in the draft — usually the framework's "stake," "landing," "reframe," or close. Trim to 80–180 chars. Quote should stand alone without context.
+- **stat-card:** identify the strongest single number in the draft + a 6–14 word caption + optional 4–10 word context. If no clear number, fall back to `headline-card`.
+
+**Resolve brand config:**
+
+1. Read `<data-root>/personas/<active>/brand.yaml`. If missing, run `/thoth brand` first (interactively offer it: *"No brand profile for this persona yet. Set one up now? (yes/skip — defaults will be used either way.)"*).
+
+**Write the content JSON** to a temp file (`/tmp/thoth-content-<rand>.json`):
+
+```json
+{
+  "headline": "Most marketers are working on the wrong layer with AI.",
+  "subhead": "Skills aren't the bottleneck. Workflow infrastructure is.",
+  "eyebrow": "Thought-leadership",
+  "attribution": "@NirvanaGuha",
+  "type_label": "thought-leadership"
+}
+```
+
+**Render via the script:**
+
+```sh
+node ~/.claude/skills/thoth/scripts/render.js \
+  --template <variant> \
+  --content /tmp/thoth-content-<rand>.json \
+  --brand <data-root>/personas/<active>/brand.yaml \
+  --out <data-root>/exports/<date>-image-<variant>.png
+```
+
+The script's first-time install of `puppeteer-core` into `~/.thoth/cache/render/` takes ~30 seconds and only happens once. After that, each render is <2 seconds.
+
+**Output:**
+
+- The PNG at `<data-root>/exports/<date>-image-<variant>.png`.
+- A debug HTML at the same path with `.html` extension — opens in any browser for visual inspection.
+- Append to history.yaml row's `exports:` block:
+  ```yaml
+  exports:
+    - format: image
+      variant: headline-card
+      path: ~/.thoth/exports/2026-05-25-image-headline-card.png
+      generated_at: 2026-05-25T11:14:00Z
+  ```
+- Show the user the output path and offer to open it: *"Rendered. Open the file? (`open ~/.thoth/exports/<file>`)"*
+
+**Hard rules for image rendering:**
+
+- **Never embed promotional content** in image text unless the source draft is Promotional type. Image rendering doesn't change the post-type rules — a Personal-type post with a stat-card variant is still Personal in tone and content.
+- **Don't render a draft that's pending-review** unless the user explicitly approved with `/thoth inbox accept` first. The reasoning: pinning a still-being-reviewed draft into a rendered artifact muddies what's actually approved.
+- **Never overwrite an existing render.** If `<date>-image-<variant>.png` exists, append `-2`, `-3`, etc.
+
+### `/thoth brand` — view / edit the persona's visual identity
+
+Reads + edits `<data-root>/personas/<active>/brand.yaml`. Schema documented in `references/brand-template.md`.
+
+**No arguments — view mode:**
+
+1. Read the active persona's brand.yaml. If missing, show: *"No brand profile yet. Run `/thoth brand setup` to create one."*
+2. Render a compact summary:
+   ```
+   Brand for nirvana
+
+     Colors
+       Primary       #191A35
+       Accent        #3B43FF
+       Background    #FFFFFF
+     Typography
+       Display       Inter
+       Body          Inter
+     Handle          @NirvanaGuha
+     Aspect ratio    1:1
+
+   Edit with /thoth brand setup or directly at ~/.thoth/personas/nirvana/brand.yaml
+   ```
+
+**`/thoth brand setup`** — interactive interview:
+
+Walk through the 5 questions documented in `references/brand-template.md`. Each question shows the current value (if any) and the default. Empty input keeps the existing value or accepts the default.
+
+```
+1/5  Primary color (headline + body)?
+     Current: #191A35  |  Default: #191A35
+     >
+```
+
+After all 5 questions, write the file and offer a test render: *"Want me to render a sample card now so you can see how it looks? (yes/no)"* — on yes, generate a headline-card from `last-post.md` (or a placeholder if no posts yet).
+
+**`/thoth brand reset`** — restore defaults:
+
+Confirm with the user, then write a brand.yaml containing only the defaults from `references/brand-template.md`.
+
 ### `/thoth frameworks` — browse the catalog
 
 Read-only. Lists the framework catalog from `references/post-types.md` and the hook library from `references/hook-patterns.md`. Used when the user wants to choose a framework manually or just understand what's available.
@@ -454,9 +569,19 @@ If any check fails, silently rewrite and re-check. Only output when all pass.
 │   ├── git-safety.md                # strict rules for git POV source
 │   ├── example-posts.md             # cross-archetype voice calibration
 │   ├── persona-template.md          # the skeleton persona.md
+│   ├── brand-template.md            # the skeleton brand.yaml + interview defaults
 │   └── commands.md                  # command reference for /thoth help
-└── scripts/
-    └── (reserved for future helpers)
+├── scripts/
+│   ├── recover.js                   # persona recovery from session logs
+│   └── render.js                    # single-image renderer (Puppeteer-core + system Chrome)
+└── templates/                       # NEW in v1.4.0
+    └── single-image/
+        ├── _shared/
+        │   ├── base.css             # layout + reset
+        │   └── tokens.css           # CSS variables overridden by brand.yaml
+        ├── quote-card.html.tmpl
+        ├── stat-card.html.tmpl
+        └── headline-card.html.tmpl
 ```
 
 ### Persona data — at `<data-root>/` (mutable, resolved at runtime)
@@ -469,18 +594,27 @@ If any check fails, silently rewrite and re-check. Only output when all pass.
 │       ├── persona.md               # canonical voice doc
 │       ├── topics.md                # pillar topics + expertise areas
 │       ├── recent.md                # daily inputs, timestamped
-│       ├── history.yaml             # posted-log (date, type, framework, hook, topic, wc, status)
+│       ├── history.yaml             # posted-log (date, type, framework, hook, topic, wc, status, exports)
 │       ├── last-post.md             # most recent draft, for regenerate
 │       ├── sources.yaml             # connected git repos (paths only)
-│       └── schedule.txt             # scheduled-task name, if any
-├── inbox/                           # NEW in v1.3.0 — daily drafts from scheduled runs
+│       ├── schedule.txt             # scheduled-task name, if any
+│       └── brand.yaml               # visual identity (v1.4.0+) — colors, fonts, handle, aspect ratio
+├── inbox/                           # daily drafts from scheduled runs (v1.3.0+)
 │   ├── 2026-05-25.md                # pending-review / accepted / rejected (per frontmatter)
 │   ├── 2026-05-24.md
 │   ├── archive/                     # auto-archived by `/thoth inbox cleanup`
 │   │   └── 2026-04/
 │   │       └── 2026-04-15.md
 │   └── _unread                      # marker file when there's new content
-└── integrations/                    # NEW in v1.3.0 — opt-in external configurations
+├── exports/                         # NEW in v1.4.0 — rendered images/PDFs/carousels
+│   ├── 2026-05-25-image-headline-card.png
+│   ├── 2026-05-25-image-headline-card.html   # debug HTML (open in browser to inspect)
+│   └── ...
+├── cache/                           # NEW in v1.4.0 — npm deps for skill scripts
+│   └── render/                      # puppeteer-core installed here (NOT in skill folder, so amskills update doesn't wipe)
+│       ├── node_modules/
+│       └── package.json
+└── integrations/                    # opt-in external configurations (v1.3.0+)
     └── schedule.yaml                # daily-run config (time, timezone, notification channel, history)
 ```
 

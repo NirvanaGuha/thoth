@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<!--
+  Thoth single-image template: headline-card
+  Best for: opening claim of a thought-leadership or educational post.
+  Content fields (from render.js):
+    headline       required   the claim (target 60–120 chars)
+    subhead        optional   one-line elaboration (target 80–140 chars)
+    eyebrow        optional   small caption above
+    attribution    optional   default: {{handle}}
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <style>{{tokens_css}}{{base_css}}
+    .headline-text {
+      max-width: 980px;
+    }
+    .headline-subhead {
+      margin-top: var(--space-4);
+      max-width: 900px;
+      color: var(--brand-muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="canvas">
+    <header class="canvas-header">
+      {{#eyebrow}}<span class="text-caption">{{eyebrow}}</span>{{/eyebrow}}
+      <span class="accent-dot"></span>
+    </header>
+
+    <main style="flex: 1; display: flex; flex-direction: column; justify-content: center;">
+      <span class="accent-bar"></span>
+      <h1 class="text-headline headline-text">{{headline}}</h1>
+      {{#subhead}}<p class="text-body headline-subhead">{{subhead}}</p>{{/subhead}}
+    </main>
+
+    <footer class="canvas-footer">
+      <span class="handle">{{attribution}}</span>
+      <span>{{type_label}}</span>
+    </footer>
+  </div>
+</body>
+</html>

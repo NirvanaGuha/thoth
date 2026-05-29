@@ -25,6 +25,8 @@ Commands:
 - `/thoth schedule [HH:MM]` — schedule recurring daily run (default 08:30 local). Drafts land in `~/.thoth/inbox/` with a system notification.
 - `/thoth unschedule` — cancel the recurring schedule.
 - `/thoth inbox` — list pending-review drafts from scheduled runs. `/thoth inbox <date>` opens one; `accept` / `reject` / `regenerate <feedback>` / `cleanup` for the actions.
+- `/thoth image [<date>] [--variant <name>]` — render a single 1200×1200 PNG from the last post or a specified draft. Auto-picks variant (`quote` / `stat` / `headline`); override with `--variant`.
+- `/thoth brand` — view the active persona's visual identity. `/thoth brand setup` runs a 2-minute interview to set colors, fonts, handle.
 - `/thoth recover` — restore persona data from past Claude session logs (use after an upgrade that wiped your data, e.g. `amskills update` from v1.0.x).
 - `/thoth update` — check for a newer release and upgrade in place. Persona data is never touched.
 - `/thoth version` — print installed version, skill path, and data root.

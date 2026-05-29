@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<!--
+  Thoth single-image template: quote-card
+  Best for: pull quote from a thought-leadership or personal post.
+  Content fields (from render.js):
+    quote          required   the pull-quote text (target 80–180 chars)
+    attribution    optional   who said it (default: {{handle}})
+    eyebrow        optional   small caption above quote (default: "")
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <style>{{tokens_css}}{{base_css}}</style>
+</head>
+<body>
+  <div class="canvas">
+    <header class="canvas-header">
+      {{#eyebrow}}<span class="text-caption">{{eyebrow}}</span>{{/eyebrow}}
+      <span class="accent-dot"></span>
+    </header>
+
+    <main style="flex: 1; display: flex; flex-direction: column; justify-content: center;">
+      <span class="accent-bar"></span>
+      <p class="text-quote">{{quote}}</p>
+    </main>
+
+    <footer class="canvas-footer">
+      <span class="handle">{{attribution}}</span>
+      <span>{{type_label}}</span>
+    </footer>
+  </div>
+</body>
+</html>

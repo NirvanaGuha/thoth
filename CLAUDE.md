@@ -92,6 +92,7 @@ rm -rf .claude
 | Change where persona data lives (data root, migration, resolution order) | `skill/SKILL.md` ("Where persona data lives" section) + `skill/personas/README.md` + `README.md` (Privacy + persona-location paragraphs) |
 | Add a writing framework | `skill/references/post-types.md` (the catalog entry under the right post type) + `CHANGELOG.md`. Frameworks must register their `Compatible hooks` against names in `skill/references/hook-patterns.md`. |
 | Add a hook pattern | `skill/references/hook-patterns.md` (full spec + glossary row + compatibility matrix row). If the hook only works with certain frameworks, update those frameworks' `Compatible hooks` lists in `skill/references/post-types.md`. |
+| Add a visual template (image / carousel / PDF) | `skill/templates/<category>/<name>.html.tmpl` + `skill/references/brand-template.md` (if new schema fields) + `skill/scripts/render.js` (if new variant logic) + the `/thoth image` (or future `/thoth visualize`) dispatch in `skill/SKILL.md`. Always use the CSS variables in `_shared/tokens.css` — never hardcode colors or sizes. |
 
 ## Non-goals (keep in mind)
 

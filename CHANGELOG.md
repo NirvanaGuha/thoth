@@ -2,6 +2,33 @@
 
 All notable changes to Thoth are documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] — 2026-05-29
+
+### Added
+- **Visual rendering — single image (MVP).** First step out of the text-only era. Thoth now renders 1200×1200 PNG cards from any accepted post or inbox draft.
+- **`/thoth image [<date>] [--variant <name>]`** command. Variants: `quote-card` (pull quote), `stat-card` (one big number + caption), `headline-card` (claim + subhead). Auto-selects the right variant from the post's content; user can override with `--variant`.
+- **`/thoth brand`** + **`/thoth brand setup`** — per-persona visual identity stored at `<data-root>/personas/<name>/brand.yaml`. 2-minute interview sets primary/accent colors, display font, LinkedIn handle, aspect ratio. Sensible defaults so the user can skip-all-and-ship.
+- **Render pipeline:**
+  - `skill/scripts/render.js` — Node + `puppeteer-core` (no Chromium bundle; uses system Chrome / Brave / Edge / Chromium).
+  - First-run install of `puppeteer-core` into `~/.thoth/cache/render/` (outside the skill folder, survives `amskills update`).
+  - Template engine: minimal mustache-lite (`{{var}}` + `{{#var}}…{{/var}}` conditionals).
+- **Template library** at `skill/templates/single-image/`:
+  - `_shared/tokens.css` — CSS variables for colors, type scale, spacing.
+  - `_shared/base.css` — layout primitives + typography utilities.
+  - `quote-card.html.tmpl` / `stat-card.html.tmpl` / `headline-card.html.tmpl`.
+  - Each template renders at @2× via Puppeteer for retina sharpness.
+- **`<data-root>/exports/`** — output directory for all rendered images. Each render writes both the PNG and a debug HTML next to it for visual inspection.
+- **`references/brand-template.md`** — documents the `brand.yaml` schema, interview defaults, and validation rules. Reserved fields for future variants (light/dark/brand) and aspect-ratio options not yet supported.
+
+### Changed
+- **`history.yaml` row** gains an optional `exports:` list — each entry records format / variant / path / generated_at. Lets `/thoth calendar` later report which posts have been visualized.
+- **Hard rules** in SKILL.md updated: image renders inherit the source draft's type and tone — a Personal-type post rendered as a stat-card is still Personal. Pending-review drafts cannot be rendered until accepted (prevents the "I rendered a draft I might not have shipped" footgun).
+- **File-layout diagram** updated for the new `templates/` tree (skill code) and the new `exports/` + `cache/` directories (data root).
+
+### Notes
+- This is the MVP of a larger visual direction. Document/PDF posts and native image carousels are planned for v1.5.0 and v1.6.0 respectively — they reuse this same renderer pipeline.
+- Renderer dependency footprint: ~10MB (puppeteer-core) instead of ~280MB (full puppeteer with bundled Chromium). Requires Chrome/Brave/Edge/Chromium installed on the system.
+
 ## [1.3.0] — 2026-05-25
 
 ### Added
@@ -115,6 +142,7 @@ Upgrading from v1.0.x via `amskills update thoth` destroys legacy persona data a
 - Daily flow (`/thoth daily`) and scheduled prompts (`/thoth schedule`).
 - npx, curl, and AM Skills install paths.
 
+[1.4.0]: https://github.com/NirvanaGuha/thoth/releases/tag/v1.4.0
 [1.3.0]: https://github.com/NirvanaGuha/thoth/releases/tag/v1.3.0
 [1.2.0]: https://github.com/NirvanaGuha/thoth/releases/tag/v1.2.0
 [1.1.3]: https://github.com/NirvanaGuha/thoth/releases/tag/v1.1.3

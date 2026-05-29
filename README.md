@@ -17,6 +17,13 @@ Named after the Egyptian god of writing, who weighed hearts against the feather 
 
 ---
 
+## What's new in v1.4
+
+- **Visual rendering — single image.** `/thoth image` produces a 1200×1200 brand-aware PNG from any post in your inbox or your last accepted draft. Three auto-selected variants — pull quote, big stat with caption, bold headline+subhead — chosen based on what's actually in the post.
+- **`/thoth brand`** — per-persona visual identity. 2-minute interview sets colors, fonts, handle. Defaults are sensible (navy + indigo + Inter) so you can skip and start rendering immediately.
+- **Renderer pipeline.** Built on `puppeteer-core` + your system Chrome — no 280MB Chromium download. First run installs ~10MB of deps into `~/.thoth/cache/`; subsequent renders take <2 seconds.
+- **Coming next:** document/PDF posts (v1.5.0) and native image carousels (v1.6.0). Same renderer; the framework catalog already gives us slide structure for free.
+
 ## What's new in v1.3
 
 - **Standuply-shaped daily mode.** `/thoth schedule 08:30` now sets up a recurring run that drops a draft into `~/.thoth/inbox/` and pings you with a system notification. Open Claude when you're ready, run `/thoth inbox` to read it.
@@ -229,6 +236,8 @@ After installing, in Claude:
 | `/thoth schedule [HH:MM]` | Set up a recurring daily run that writes a draft to `~/.thoth/inbox/` and pings you with a system notification. Default 08:30 local. |
 | `/thoth unschedule` | Cancel the recurring schedule. |
 | `/thoth inbox` | List pending-review drafts from scheduled runs. `/thoth inbox <date>` opens one; `accept` / `reject` / `regenerate` decides its fate. Drafts only count toward your content-mix ratio after you accept them. |
+| `/thoth image [<date>] [--variant <name>]` | Render the post as a single 1200×1200 PNG. Auto-picks the right variant (quote / stat / headline) from the post content. Brand-aware (uses your persona's `brand.yaml`). |
+| `/thoth brand` | View the active persona's visual identity. `/thoth brand setup` walks a quick interview to set colors, font, handle. |
 | `/thoth recover` | Restore personas from past Claude session logs after an upgrade wiped your data. |
 | `/thoth update` | Check for a newer Thoth release and upgrade in place. Persona data is not touched. |
 | `/thoth version` | Print the installed Thoth version and where the skill + data live. |
@@ -423,6 +432,7 @@ To back up: copy `~/.thoth/`. To migrate machines: copy `~/.thoth/` to the new i
 
 Full version history is in [CHANGELOG.md](./CHANGELOG.md). Recent highlights:
 
+- **v1.4.0** — Visual rendering (MVP). `/thoth image` produces 1200×1200 brand-aware PNG cards from any post — quote, stat, or headline variants, auto-picked from content. `/thoth brand` to set up your persona's visual identity.
 - **v1.3.0** — Standuply-shaped daily flow. `/thoth schedule` now drops drafts in `~/.thoth/inbox/` with a system notification; `/thoth inbox` to review, accept, regenerate, or reject. Drafts only count toward your ratio after you accept them.
 - **v1.2.0** — Framework catalog (20 frameworks across 5 types) + hook pattern library (13 patterns) + `/thoth frameworks` command. Every generated post now picks a named framework and hook with rotation.
 - **v1.1.3** — Ship `CHANGELOG.md`; add "What's new" highlights to the README.
