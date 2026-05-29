@@ -17,6 +17,12 @@ Named after the Egyptian god of writing, who weighed hearts against the feather 
 
 ---
 
+## What's new in v1.3
+
+- **Standuply-shaped daily mode.** `/thoth schedule 08:30` now sets up a recurring run that drops a draft into `~/.thoth/inbox/` and pings you with a system notification. Open Claude when you're ready, run `/thoth inbox` to read it.
+- **`/thoth inbox`** — list pending drafts, open one, `accept` to promote it (counts toward ratio), `reject` to skip, `regenerate` to redraft with feedback.
+- **Drafts you never accepted don't skew your ratio.** Only `accepted` posts count toward `/thoth calendar` math and the framework/hook rotation windows.
+
 ## What's new in v1.2
 
 - **Framework catalog** — 20 named writing frameworks (4 per post type) replacing the previous one-template-per-type model. Each framework has a documented origin, shape, must-have rules, anti-pattern, and worked spine. Examples: `heretical-claim-receipts-stake` (thought-leadership), `decision-log` (work), `quiet-reveal` (personal), `pmrg` (educational), `story-first-promo` (promotional).
@@ -220,8 +226,9 @@ After installing, in Claude:
 | `/thoth list` | Show all personas on this install. |
 | `/thoth connect git <path>` | Add a local repo as a POV source (abstract themes only, strict redaction). |
 | `/thoth disconnect git <path>` | Remove a git source. |
-| `/thoth schedule [HH:MM]` | Automate the daily flow via the `schedule` skill. |
+| `/thoth schedule [HH:MM]` | Set up a recurring daily run that writes a draft to `~/.thoth/inbox/` and pings you with a system notification. Default 08:30 local. |
 | `/thoth unschedule` | Cancel the recurring schedule. |
+| `/thoth inbox` | List pending-review drafts from scheduled runs. `/thoth inbox <date>` opens one; `accept` / `reject` / `regenerate` decides its fate. Drafts only count toward your content-mix ratio after you accept them. |
 | `/thoth recover` | Restore personas from past Claude session logs after an upgrade wiped your data. |
 | `/thoth update` | Check for a newer Thoth release and upgrade in place. Persona data is not touched. |
 | `/thoth version` | Print the installed Thoth version and where the skill + data live. |
@@ -416,6 +423,7 @@ To back up: copy `~/.thoth/`. To migrate machines: copy `~/.thoth/` to the new i
 
 Full version history is in [CHANGELOG.md](./CHANGELOG.md). Recent highlights:
 
+- **v1.3.0** — Standuply-shaped daily flow. `/thoth schedule` now drops drafts in `~/.thoth/inbox/` with a system notification; `/thoth inbox` to review, accept, regenerate, or reject. Drafts only count toward your ratio after you accept them.
 - **v1.2.0** — Framework catalog (20 frameworks across 5 types) + hook pattern library (13 patterns) + `/thoth frameworks` command. Every generated post now picks a named framework and hook with rotation.
 - **v1.1.3** — Ship `CHANGELOG.md`; add "What's new" highlights to the README.
 - **v1.1.2** — `/thoth update` and `/thoth version` commands.

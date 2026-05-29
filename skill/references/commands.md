@@ -22,8 +22,9 @@ Commands:
 - `/thoth list` — show all personas on this install.
 - `/thoth connect git <path>` — add a local repo as a POV source. Read-only, abstract themes only — see the one-line rules shown on connect.
 - `/thoth disconnect git <path>` — remove a git source.
-- `/thoth schedule [HH:MM]` — schedule recurring daily prompt (default 08:30 local).
+- `/thoth schedule [HH:MM]` — schedule recurring daily run (default 08:30 local). Drafts land in `~/.thoth/inbox/` with a system notification.
 - `/thoth unschedule` — cancel the recurring schedule.
+- `/thoth inbox` — list pending-review drafts from scheduled runs. `/thoth inbox <date>` opens one; `accept` / `reject` / `regenerate <feedback>` / `cleanup` for the actions.
 - `/thoth recover` — restore persona data from past Claude session logs (use after an upgrade that wiped your data, e.g. `amskills update` from v1.0.x).
 - `/thoth update` — check for a newer release and upgrade in place. Persona data is never touched.
 - `/thoth version` — print installed version, skill path, and data root.

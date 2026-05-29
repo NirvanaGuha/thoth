@@ -2,6 +2,33 @@
 
 All notable changes to Thoth are documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] — 2026-05-25
+
+### Added
+- **Inbox mode for scheduled runs.** `/thoth schedule [HH:MM]` now produces a Standuply-shaped daily flow: at the configured time, Thoth generates a draft, writes it to `~/.thoth/inbox/YYYY-MM-DD.md`, and fires a system notification. The draft sits as `pending-review` until you decide what to do with it.
+- **`/thoth inbox`** command suite:
+  - `/thoth inbox` — list drafts with status and metadata.
+  - `/thoth inbox <date>` — open a specific draft for review.
+  - `/thoth inbox accept [<date>]` — promote the draft, copy to `last-post.md`, mark `accepted` in history.
+  - `/thoth inbox reject [<date>]` — mark `rejected`; kept for the record but excluded from ratio math.
+  - `/thoth inbox regenerate [<date>] [<feedback>]` — redraft in place with optional steering.
+  - `/thoth inbox cleanup` — archive accepted / rejected drafts older than 30 days under `inbox/archive/`.
+- **`<data-root>/integrations/schedule.yaml`** — new config file storing time, timezone, notification channel, schedule ID, and last-run history.
+- **`<data-root>/inbox/`** directory tree, with `_unread` marker file for cross-session "new content" detection.
+
+### Changed
+- **`/thoth daily` is now dual-mode.** Interactive mode (user-typed) behaves as before — asks "anything happen today?", drafts, returns to stdout. **Scheduled mode** (triggered by `[scheduled run]` marker or `THOTH_SCHEDULED=1` env) skips the question, writes to inbox, notifies. Soft preference for shorter post types on scheduled runs.
+- **`history.yaml` schema** gains a `status:` field (`accepted` | `pending-review` | `rejected` | `regenerating`). Older rows without `status` are treated as `accepted` for backwards compatibility.
+- **Content-mix ratio math** now counts only `accepted` rows. `pending-review` and `rejected` rows are excluded from both the ratio computation and the framework / hook rotation windows — drafts the user never shipped don't skew future picks.
+- **`/thoth schedule`** integrates with notification channels (macOS notifications by default; Telegram / Slack / Discord via the `configure-notifications` skill if already configured) and runs through the OMC `schedule` skill, `scheduled-tasks` MCP, or native crontab — whichever is available.
+
+### Topic-seeding fallback chain (scheduled mode)
+1. `recent.md` entry from the last 24 hours → use it.
+2. Else most recent `recent.md` entry in the last 7 days → use it.
+3. Else fall back to topic rotation from `topics.md` + persona's `contrarian_beliefs` / `signature_grievances`.
+
+Ensures a scheduled run never silently fails for lack of input.
+
 ## [1.2.0] — 2026-05-24
 
 ### Added
@@ -88,6 +115,7 @@ Upgrading from v1.0.x via `amskills update thoth` destroys legacy persona data a
 - Daily flow (`/thoth daily`) and scheduled prompts (`/thoth schedule`).
 - npx, curl, and AM Skills install paths.
 
+[1.3.0]: https://github.com/NirvanaGuha/thoth/releases/tag/v1.3.0
 [1.2.0]: https://github.com/NirvanaGuha/thoth/releases/tag/v1.2.0
 [1.1.3]: https://github.com/NirvanaGuha/thoth/releases/tag/v1.1.3
 [1.1.2]: https://github.com/NirvanaGuha/thoth/releases/tag/v1.1.2

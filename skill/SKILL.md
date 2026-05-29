@@ -1,6 +1,6 @@
 ---
 name: thoth
-version: 1.2.0
+version: 1.3.0
 description: Build and maintain a unique, consistent LinkedIn voice for one or more users. Runs a framework-driven persona interview (brand archetypes + tone spectrum + hot-take exercises), then generates ready-to-publish LinkedIn posts across a 30/25/20/15/10 content mix (Personal / Work / Thought-leadership / Educational / Promotional). Handles multi-user installs — teams, agencies, or families can share one install with a persona per person. Trigger on any `/thoth` command, on phrases like "write a LinkedIn post", "draft a post for [name]", "help me sound more like myself on LinkedIn", "onboard me on Thoth", "set up my LinkedIn voice", or when the user asks for help building a personal brand / thought leadership on LinkedIn. Also trigger when the user references their own posting cadence, content calendar, or wants to regenerate a post. Use this skill instead of writing a generic LinkedIn post whenever the user has a Thoth persona on file.
 ---
 
@@ -87,8 +87,9 @@ All commands are of the form `/thoth [subcommand] [args...]`. The `<name>` arg a
 | `/thoth list` | List all personas on this install. |
 | `/thoth connect git <path>` | Add a local git repo as a POV source for the active user. Read-only. Never promoted. See `references/git-safety.md`. |
 | `/thoth disconnect git <path>` | Remove a git source. |
-| `/thoth schedule [HH:MM]` | Set up a recurring daily prompt via the `schedule` skill. Default 08:30 local time. |
+| `/thoth schedule [HH:MM]` | Set up a recurring daily run that writes a draft to `inbox/` and pings the user. Default 08:30 local time. |
 | `/thoth unschedule` | Cancel the recurring schedule. |
+| `/thoth inbox` | List drafts produced by scheduled runs that are awaiting review. `/thoth inbox <date>` opens a specific one; `/thoth inbox accept` / `reject` / `regenerate` handles a draft. |
 | `/thoth recover` | Scan past Claude session logs for persona content and restore it to the current data root. Use after an upgrade that wiped your persona data (e.g. `amskills update` from a v1.0.x install). |
 | `/thoth update` | Check for a newer Thoth release and upgrade in place. Persona data is independent of the skill folder — never touched. |
 | `/thoth version` | Print the installed Thoth version and where the skill + data live. |
@@ -140,9 +141,58 @@ Selection runs in four ordered steps before drafting begins. The full algorithm 
 
 ### `/thoth daily`
 
+Two modes depending on how `/thoth daily` was invoked.
+
+**Mode A — interactive (user-typed `/thoth daily`):**
+
 1. Ask the user: *"Anything interesting happen today? A meeting, a win, a frustration, a thing you read, a conversation — doesn't have to be big. (or type 'skip')"*
 2. Append the response to `personas/<active>/recent.md` with today's date.
 3. Run the `/thoth` generate flow, weighting today's recent entry heavily in topic selection.
+4. Log the post to `history.yaml` with `status: accepted` (interactive mode means the user is here — they implicitly accept by being part of the flow).
+
+**Mode B — scheduled (invoked by `/thoth schedule`):**
+
+Detect this mode by the presence of either:
+- Environment variable `THOTH_SCHEDULED=1`, OR
+- The trigger prompt containing the literal string `"[scheduled run]"`.
+
+In Mode B, do not ask the user anything — there's no user attached. Behavior:
+
+1. **Read context:** `persona.md`, `topics.md`, `history.yaml`, the last 7 days of `recent.md` entries.
+2. **No interactive prompt.** Skip the "anything interesting happen today?" question.
+3. **Topic seeding fallback chain:**
+   - If `recent.md` has an entry from the last 24 hours → use it as the topic seed.
+   - Else if `recent.md` has entries from the last 7 days → use the most recent one.
+   - Else → fall back to **topic rotation** from `topics.md` + the active persona's `contrarian_beliefs` or `signature_grievances` if relevant to the rotated topic.
+4. Run the normal **type → framework → hook → topic** selection (per `references/content-mix.md`), but with a soft preference for shorter post types (Personal, Promotional) on scheduled runs — the user is more likely to engage with a polished short draft than a 400-word thought-leadership wall they have to edit.
+5. Generate the draft.
+6. **Write to inbox**, not stdout:
+   - Path: `<data-root>/inbox/YYYY-MM-DD.md` (use the scheduled day's date in the persona's configured timezone from `<data-root>/integrations/schedule.yaml`).
+   - If a file at that path already exists today, append a `-2`, `-3` suffix — don't overwrite a draft the user might still be reviewing.
+   - The file contains a YAML frontmatter block + the draft body:
+     ```yaml
+     ---
+     status: pending-review
+     date: 2026-05-25
+     persona: nirvana
+     type: thought-leadership
+     framework: heretical-claim-receipts-stake
+     hook: inverted-truism
+     topic: AI workflows vs prompt training
+     wordcount: 312
+     generated_at: 2026-05-25T08:30:14+05:30
+     ---
+
+     <draft body>
+     ```
+7. **Append to `history.yaml`** with `status: pending-review`. This row is excluded from `/thoth calendar` ratio math until accepted (see `references/content-mix.md`).
+8. **Fire a notification** using the rules in `integrations/schedule.yaml`:
+   - `notification: macos` → run via Bash: `osascript -e 'display notification "Today's Thoth draft is ready. Run /thoth inbox to read it." with title "Thoth" sound name "Glass"'`
+   - `notification: telegram` / `slack` / `discord` → use the `configure-notifications` skill's send action with channel and message.
+   - `notification: none` → skip, but write `<data-root>/inbox/_unread` as a marker file so `/thoth inbox` can detect there's something new.
+9. Update `integrations/schedule.yaml`'s `last_run` + `last_run_outcome` fields.
+
+If anything in step 6–8 fails (write error, notification failure), still attempt the remaining steps — a draft that exists but didn't notify is recoverable; a missed notification with no draft is worse.
 
 ### `/thoth regenerate [feedback]`
 
@@ -173,13 +223,98 @@ Then say which type is "next up" based on the ratio gap.
 
 ### `/thoth schedule [HH:MM]`
 
-Use the `schedule` skill to create a recurring task. The scheduled prompt should be a self-contained instruction like:
+Sets up a recurring daily run that produces an inbox draft and pings the user. Combines a cron trigger + notification configuration.
 
-> "Run `/thoth daily` for the currently active Thoth persona."
+**Dispatch:**
+
+1. **Time argument.** Default `08:30`. Accept any `HH:MM` 24-hour value. Reject ambiguous AM/PM strings.
+2. **Timezone.** Read from the OS (`date +%Z`). If the user wants a different timezone (e.g. they travel), they can edit `integrations/schedule.yaml` after.
+3. **Notification channel selection.** Check what's available, in this order:
+   - Read `<data-root>/integrations/schedule.yaml` if it exists — honor any existing `notification:` setting.
+   - Else check if `configure-notifications` skill has Telegram / Slack / Discord configured (look at its config or ask: *"Use your already-configured Telegram channel for daily notifications?"*).
+   - Else default to `macos` on macOS, `linux-notify-send` on Linux, `none` elsewhere.
+4. **Create or update `<data-root>/integrations/schedule.yaml`:**
+   ```yaml
+   enabled: true
+   time: "08:30"
+   timezone: "Asia/Kolkata"
+   notification: macos
+   inbox_path: ~/.thoth/inbox/
+   schedule_id: <id from the cron tool used below>
+   last_run: null
+   last_run_outcome: null
+   ```
+5. **Create the cron job.** Try in this order:
+   - If the OMC `schedule` skill is available, delegate to it: schedule a daily task with the prompt *"[scheduled run] Run /thoth daily for the currently active Thoth persona."* — the `[scheduled run]` marker triggers Mode B in `/thoth daily`. Store the returned schedule ID in `schedule.yaml`.
+   - Else if `scheduled-tasks` MCP is available, use that.
+   - Else write a native crontab entry that runs Claude Code in headless mode with the same prompt. Print the entry for the user to inspect.
+6. **Create the inbox directory** if it doesn't exist: `mkdir -p <data-root>/inbox/`.
+7. **Confirm to the user:**
+   > *"Daily Thoth scheduled for 08:30 (Asia/Kolkata). Drafts will land in `~/.thoth/inbox/` and you'll get a macOS notification when one's ready. Run `/thoth inbox` to read it. Cancel anytime with `/thoth unschedule`."*
+8. **Offer a dry run:** *"Want me to run one now as a test, so you can see what the daily output looks like?"* — on yes, run `/thoth daily` in Mode B once immediately (with today's date suffix `-test` so it doesn't collide with tomorrow's real run).
 
 The skill resolves the active persona itself when the scheduled task fires — don't bake a data-root path into the prompt, since the data root is resolved at runtime per the rules in "Where persona data lives."
 
-Default time: 08:30 in the user's local timezone. If the user passes a time, use it. Store the scheduled task name in `personas/<active>/schedule.txt` so `unschedule` can find it.
+### `/thoth unschedule`
+
+1. Read `<data-root>/integrations/schedule.yaml`. If missing or `enabled: false`, tell the user there's nothing to cancel.
+2. Cancel the cron job by ID (whatever tool was used to create it — `schedule` skill, `scheduled-tasks`, or crontab).
+3. Update `schedule.yaml` to `enabled: false` (don't delete the file — keep last_run history).
+4. Confirm: *"Daily Thoth cancelled. Existing inbox drafts are unaffected. Run `/thoth schedule` again to reactivate."*
+
+### `/thoth inbox` — review scheduled drafts
+
+Read-by-default; act on the user's confirmation.
+
+**No arguments — list mode:**
+
+1. Resolve the data root.
+2. List every file in `<data-root>/inbox/` sorted by date descending. For each, show: date, type, framework, hook, topic, wordcount, status.
+3. Output as a compact table. Highlight the most recent `pending-review` row.
+4. If the `_unread` marker file exists, surface a leading line: *"You have N new drafts to review."*
+
+```
+Thoth inbox — 3 drafts
+
+  ● 2026-05-25   thought-leadership   heretical-claim   inverted-truism   312w   PENDING
+    2026-05-24   personal             quiet-reveal       micro-confession   180w   ACCEPTED
+    2026-05-23   work                 decision-log       constraint-reveal  248w   REJECTED
+
+Run /thoth inbox 2026-05-25 to read the pending draft.
+```
+
+After listing, clear `<data-root>/inbox/_unread`.
+
+**`/thoth inbox <date>` — open a draft:**
+
+1. Read `<data-root>/inbox/<date>.md`.
+2. Render the body (omit the YAML frontmatter from display, but keep it in the file).
+3. After rendering, ask: *"Accept, regenerate, or reject? (a/r/x or 'edit' to open in $EDITOR)"*
+
+**`/thoth inbox accept [<date>]`:**
+
+1. If no date, default to the most recent `pending-review` draft.
+2. Update the inbox file's frontmatter: `status: accepted`.
+3. Copy the draft body to `personas/<active>/last-post.md` (so `/thoth regenerate` works on it).
+4. Update the matching `history.yaml` row: `status: accepted`. Now it counts toward the `/thoth calendar` ratio math.
+5. Confirm: *"Accepted. Draft is in `last-post.md`. Copy & post when ready."*
+
+**`/thoth inbox reject [<date>]`:**
+
+1. Update inbox file frontmatter: `status: rejected`.
+2. Update `history.yaml` row: `status: rejected`.
+3. Confirm. Don't delete the file — keep for record.
+
+**`/thoth inbox regenerate [<date>] [<feedback>]`:**
+
+1. Update inbox file frontmatter: `status: regenerating`.
+2. Run the normal `/thoth regenerate` flow on that draft, with optional feedback.
+3. Overwrite the inbox file body with the new draft (frontmatter status returns to `pending-review`).
+
+**`/thoth inbox cleanup`:**
+
+1. Archive all `accepted` or `rejected` drafts older than 30 days into `<data-root>/inbox/archive/YYYY-MM/`.
+2. Don't touch `pending-review` drafts regardless of age — those are still waiting on the user.
 
 ### `/thoth frameworks` — browse the catalog
 
@@ -328,16 +463,25 @@ If any check fails, silently rewrite and re-check. Only output when all pass.
 
 ```
 <data-root>/                         # ~/.thoth/ (default), ./.thoth/ (per-project), or legacy ~/.claude/skills/thoth/
-└── personas/
-    ├── .active                      # single line: active username
-    └── <username>/
-        ├── persona.md               # canonical voice doc
-        ├── topics.md                # pillar topics + expertise areas
-        ├── recent.md                # daily inputs, timestamped
-        ├── history.yaml             # posted-log (date, type, topic, wc)
-        ├── last-post.md             # most recent draft, for regenerate
-        ├── sources.yaml             # connected git repos (paths only)
-        └── schedule.txt             # scheduled-task name, if any
+├── personas/
+│   ├── .active                      # single line: active username
+│   └── <username>/
+│       ├── persona.md               # canonical voice doc
+│       ├── topics.md                # pillar topics + expertise areas
+│       ├── recent.md                # daily inputs, timestamped
+│       ├── history.yaml             # posted-log (date, type, framework, hook, topic, wc, status)
+│       ├── last-post.md             # most recent draft, for regenerate
+│       ├── sources.yaml             # connected git repos (paths only)
+│       └── schedule.txt             # scheduled-task name, if any
+├── inbox/                           # NEW in v1.3.0 — daily drafts from scheduled runs
+│   ├── 2026-05-25.md                # pending-review / accepted / rejected (per frontmatter)
+│   ├── 2026-05-24.md
+│   ├── archive/                     # auto-archived by `/thoth inbox cleanup`
+│   │   └── 2026-04/
+│   │       └── 2026-04-15.md
+│   └── _unread                      # marker file when there's new content
+└── integrations/                    # NEW in v1.3.0 — opt-in external configurations
+    └── schedule.yaml                # daily-run config (time, timezone, notification channel, history)
 ```
 
 **Important:** never create a persona folder with a name that contains slashes, spaces, or shell-metacharacters. Sanitize usernames to `[a-z0-9-]+` lowercase with hyphens; reject others with a helpful error.
