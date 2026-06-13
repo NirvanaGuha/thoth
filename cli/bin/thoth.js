@@ -3,6 +3,7 @@
 // Usage:
 //   npx thoth-skill init                 # install to ~/.claude/skills/thoth
 //   npx thoth-skill init --ai cursor     # install to ~/.cursor/skills/thoth
+//   npx thoth-skill init --ai codex      # install to ~/.codex/skills/thoth
 //   npx thoth-skill init --local         # install to ./.claude/skills/thoth
 //   npx thoth-skill init --offline       # use bundled assets only (skip GitHub fetch)
 //   npx thoth-skill uninstall            # remove the skill
@@ -61,6 +62,7 @@ const SKILL_DIR_MAP = {
   claude: '.claude/skills',       // Claude Code & Cowork
   cursor: '.cursor/skills',       // Cursor
   windsurf: '.windsurf/skills',   // Windsurf
+  codex: '.codex/skills',         // OpenAI Codex CLI
 };
 
 function resolveTarget(flags) {

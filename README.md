@@ -145,8 +145,9 @@ curl -fsSL https://raw.githubusercontent.com/NirvanaGuha/thoth/main/install.sh |
 Installs to `~/.claude/skills/thoth/`. Respects these env vars:
 
 ```sh
-THOTH_AI=cursor     THOTH_SCOPE=local     THOTH_REF=v1.0.0
+THOTH_AI=codex      THOTH_SCOPE=local     THOTH_REF=v1.5.0
 ```
+`THOTH_AI` accepts `claude` (default), `cursor`, `windsurf`, or `codex` (→ `~/.codex/skills/thoth`).
 
 ### Option 2 — npx (recommended for Node users)
 
@@ -154,6 +155,7 @@ THOTH_AI=cursor     THOTH_SCOPE=local     THOTH_REF=v1.0.0
 npx thoth-skill init                   # default: user-global, Claude
 npx thoth-skill init --local           # project-local (./.claude/skills/thoth)
 npx thoth-skill init --ai cursor       # Cursor
+npx thoth-skill init --ai codex        # OpenAI Codex (→ ~/.codex/skills/thoth)
 npx thoth-skill update                 # pull latest — your personas in ~/.thoth/ are untouched
 npx thoth-skill uninstall              # remove the skill — your personas in ~/.thoth/ are kept
 ```
@@ -179,7 +181,7 @@ git clone https://github.com/NirvanaGuha/thoth.git
 cp -r thoth/skill ~/.claude/skills/thoth
 ```
 
-Works with Claude Code, Claude Desktop, Cowork, Cursor, Windsurf — anywhere that supports standard `.claude/skills/` skills.
+Works with Claude Code, Claude Desktop, Cowork, Cursor, Windsurf, and OpenAI Codex — anywhere that supports standard `.claude/skills/`-style skills.
 
 ---
 

@@ -6,7 +6,7 @@
 #
 # Env vars:
 #   THOTH_REPO   override the GitHub repo (default: NirvanaGuha/thoth)
-#   THOTH_AI     claude | cursor | windsurf (default: claude)
+#   THOTH_AI     claude | cursor | windsurf | codex (default: claude)
 #   THOTH_SCOPE  home | local (default: home; local installs to ./<ai>/skills/thoth)
 #   THOTH_REF    git ref to install (default: latest release, falls back to main)
 #
@@ -23,7 +23,8 @@ case "$AI" in
   claude)   AI_DIR=".claude/skills" ;;
   cursor)   AI_DIR=".cursor/skills" ;;
   windsurf) AI_DIR=".windsurf/skills" ;;
-  *) echo "Unknown THOTH_AI=$AI — supported: claude, cursor, windsurf" >&2; exit 1 ;;
+  codex)    AI_DIR=".codex/skills" ;;
+  *) echo "Unknown THOTH_AI=$AI — supported: claude, cursor, windsurf, codex" >&2; exit 1 ;;
 esac
 
 if [ "$SCOPE" = "local" ]; then

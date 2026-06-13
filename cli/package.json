@@ -1,6 +1,6 @@
 {
   "name": "thoth-skill",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "Install Thoth — the open-source LinkedIn voice skill for Claude. One command to set up framework-driven persona interviews and daily post generation.",
   "keywords": [
     "claude",
