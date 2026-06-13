@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<!--
+  Thoth single-image template: cycle-card  (sticker re-skin)
+  Best for: a "this never stops, it loops" post — a repeating cycle of N stages
+  that feed back into the first (cf. catalog "Cycle"). Reads as a flywheel /
+  closed loop rather than a linear list: every stage points clockwise to the
+  next, and the last arcs back to the top to close the circle.
+
+  Re-skinned to match steps-card / layers-card / venn-card: a headline .lockup
+  with a punchy word in a .pill, an optional .subtitle, and a ring of outlined,
+  palette-swatch-filled sticker cards arranged clockwise around a center. Curved
+  SVG arrows connect consecutive stages and close the loop; an optional word
+  sits in the middle. All colour is token-driven so a persona's brand.yaml
+  restyles it together with the rest of the family.
+
+  Content fields (from render.js):
+    eyebrow         optional   small uppercase caption above the headline
+    headline        required   the title lead-in (target 14–40 chars)
+    pill            optional   one punchy word/phrase punched into the lockup pill
+    subhead         optional   one muted line under the lockup
+    stage1_label    required   label for stage 1  (sits at 12 o'clock)
+    stage1_desc     optional   one short line under stage 1's label
+    stage2_label    required   label for stage 2  (2 minimum; goes clockwise)
+    stage2_desc     optional   matching description
+    stage3_label    optional   label for stage 3  (present -> 3-stage ring)
+    stage3_desc     optional   matching description
+    stage4_label    optional   label for stage 4  (present -> 4-stage ring)
+    stage4_desc     optional   matching description
+    stage5_label    optional   label for stage 5  (present -> 5-stage ring)
+    stage5_desc     optional   matching description
+    center_label    optional   one word in the middle of the loop (e.g. "Loop")
+    type_label      optional   footer genre label (e.g. "Framework")
+    attribution     optional   default: handle
+
+  Render only the stages whose label slot is filled. Each stage is a FIXED
+  numbered slot wrapped in a SINGLE conditional on its label; stageN_desc inside
+  it is a plain variable substitution that collapses via the .node-desc:empty
+  rule when absent. The stage COUNT is NOT passed as a variable — geometry is
+  driven purely off how many .node elements exist, via
+  .cycle-stage:has(.n5) / :has(.n4):not(:has(.n5)) / :has(.n3):not(:has(.n4))
+  selectors (Chrome, the renderer, supports :has()), exactly like venn-card. So
+  3 / 4 / 5 stages each get their own clockwise arrangement with no count flag,
+  and the matching arc set is shown via the same :has() switch.
+
+  GEOMETRY: one inline SVG fills the stage in a pixel-exact 820x760 viewBox
+  (default preserveAspectRatio, so arcs keep true curvature — NOT stretched).
+  Node cards are absolutely positioned by percentage of that same 820x760 box
+  (left% = x/820, top% = y/760) and centered on their point with translate
+  (-50%,-50%), so cards and arcs share one coordinate frame. Ring center is
+  (410,400); node ring radius is 300. Each arc is its own .arc path drawn along
+  r=300 between consecutive node angles, trimmed at both ends so it floats
+  between the cards, with an arrowhead chevron appended to the SAME path (two
+  short relative segments) so M.drawOn draws the line then the arrowhead last.
+  Only the arc set for the active arity is rendered (the others are display:none
+  via the :has() switch) so getTotalLength only ever measures visible paths.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <style>{{tokens_css}}{{base_css}}
+    .cycle-headline { max-width: 880px; margin-bottom: var(--space-2); }
+    .cycle-headline .pill { font-size: 0.92em; }
+    .cycle-sub { margin-bottom: var(--space-3); }
+
+    /* Relatively-positioned stage the absolute nodes + arc SVG share. Fixed box
+       (820x760) sits within the 888x1158 usable area; nodes are pinned by their
+       CENTER (translate -50%,-50%) at the percentages computed below so the
+       geometry is exact and never clips. */
+    .cycle-stage {
+      position: relative;
+      width: 820px;
+      height: 760px;
+      margin: var(--space-2) auto 0;
+      flex: 0 0 auto;
+    }
+
+    /* The arc layer: one SVG stretched over the whole stage in a pixel-exact
+       820x760 viewBox (default preserveAspectRatio keeps circles round). Sits
+       BEHIND the node cards (z-index) so arrows tuck under the stickers. */
+    .cycle-arcs {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+      overflow: visible;
+    }
+    /* Curved connectors + their arrowhead chevrons. Ink stroke, no fill, round
+       caps/joins so the drawn line + arrowhead read cleanly. M.drawOn animates
+       stroke-dashoffset; resting state (full stroke) = final look for static
+       PNG. Colour from the brand ink token, never hardcoded. */
+    .cycle-arcs .arc {
+      stroke: var(--brand-ink);
+      stroke-width: 5;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    /* Each stage node: a compact kit sticker centered on its ring point. Inherits
+       the kit outline / radius / drop-shadow from .card; the per-node .fill-N
+       class supplies a palette swatch. Fixed width keeps the ring even; text is
+       centered and clamped so long labels never blow out the circle. */
+    .node {
+      position: absolute;
+      z-index: 1;
+      width: 210px;
+      transform: translate(-50%, -50%);
+      padding: var(--space-2) var(--space-3);
+      text-align: center;
+    }
+    .node-label {
+      display: block;
+      font-family: var(--font-display);
+      font-weight: var(--weight-headline);
+      font-size: 34px;
+      line-height: var(--leading-tight);
+      letter-spacing: -0.02em;
+      color: var(--brand-ink);
+    }
+    .node-desc {
+      display: block;
+      margin-top: 6px;
+      font-family: var(--font-body);
+      font-size: 24px;
+      font-weight: var(--weight-body);
+      line-height: var(--leading-normal);
+      color: var(--brand-muted);
+    }
+    /* Bare stageN_desc renders empty when absent -> collapse the line. */
+    .node-desc:empty { display: none; }
+
+    /* The optional loop word, pinned to the ring center (410,400 in the 820x760
+       box -> 50% / 52.6%). A dashed sticker tag in the brand accent, above the
+       arcs (z-index) so it reads as the hub the loop turns around. */
+    .cycle-center {
+      position: absolute;
+      left: 50%;
+      top: 52.6%;
+      transform: translate(-50%, -50%);
+      z-index: 2;
+      text-align: center;
+    }
+    .cycle-center .tag {
+      background: var(--brand-accent);
+      color: var(--brand-bg);
+      border-style: solid;
+      border-color: var(--brand-accent);
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: var(--size-body);
+      letter-spacing: -0.01em;
+      padding: 0.16em 0.66em;
+      box-shadow: 0 6px 0 var(--card-shadow);
+      white-space: nowrap;
+    }
+
+    /* ---- Node placement, driven purely off stage COUNT via :has() ----
+       Ring center (410,400), radius 300, in the 820x760 box. left/top are the
+       node CENTER as a percentage of the box; translate(-50%,-50%) (above)
+       centers the card on the point. Angles go clockwise from 12 o'clock. Only
+       the arc set matching the active arity is shown; the rest are hidden so
+       drawOn never measures an off-screen path. */
+
+    /* Hide every arc set by default; the :has() rules below switch on the one
+       matching the rendered stage count. */
+    .arcs-3, .arcs-4, .arcs-5 { display: none; }
+
+    /* 3 stages: angles 0 / 120 / 240. */
+    .cycle-stage:has(.n3):not(:has(.n4)) .arcs-3 { display: block; }
+    .cycle-stage:has(.n3):not(:has(.n4)) .n1 { left: 50.0%; top: 13.2%; }   /* (410,100) */
+    .cycle-stage:has(.n3):not(:has(.n4)) .n2 { left: 81.7%; top: 72.4%; }   /* (670,550) */
+    .cycle-stage:has(.n3):not(:has(.n4)) .n3 { left: 18.3%; top: 72.4%; }   /* (150,550) */
+
+    /* 4 stages: angles 0 / 90 / 180 / 270. */
+    .cycle-stage:has(.n4):not(:has(.n5)) .arcs-4 { display: block; }
+    .cycle-stage:has(.n4):not(:has(.n5)) .n1 { left: 50.0%; top: 13.2%; }   /* (410,100) */
+    .cycle-stage:has(.n4):not(:has(.n5)) .n2 { left: 86.6%; top: 52.6%; }   /* (710,400) */
+    .cycle-stage:has(.n4):not(:has(.n5)) .n3 { left: 50.0%; top: 92.1%; }   /* (410,700) */
+    .cycle-stage:has(.n4):not(:has(.n5)) .n4 { left: 13.4%; top: 52.6%; }   /* (110,400) */
+
+    /* 5 stages: angles 0 / 72 / 144 / 216 / 288. */
+    .cycle-stage:has(.n5) .arcs-5 { display: block; }
+    .cycle-stage:has(.n5) .n1 { left: 50.0%; top: 13.2%; }                  /* (410,100) */
+    .cycle-stage:has(.n5) .n2 { left: 84.8%; top: 40.4%; }                  /* (695,307) */
+    .cycle-stage:has(.n5) .n3 { left: 71.5%; top: 84.6%; }                  /* (586,643) */
+    .cycle-stage:has(.n5) .n4 { left: 28.5%; top: 84.6%; }                  /* (234,643) */
+    .cycle-stage:has(.n5) .n5 { left: 15.2%; top: 40.4%; }                  /* (125,307) */
+  </style>
+</head>
+<body>
+  <div class="canvas">
+    <header class="canvas-header">
+      {{#eyebrow}}<span class="text-caption">{{eyebrow}}</span>{{/eyebrow}}
+      <span class="accent-dot"></span>
+    </header>
+
+    <main style="flex: 1; display: flex; flex-direction: column; justify-content: center;">
+      <h1 class="text-headline-sm cycle-headline lockup">
+        <span>{{headline}}</span>{{#pill}} <span class="pill">{{pill}}</span>{{/pill}}
+      </h1>
+      {{#subhead}}<p class="subtitle cycle-sub">{{subhead}}</p>{{/subhead}}
+
+      <!-- The loop. The arc SVG is a sibling pinned over the whole stage; only
+           the arc set for the active arity is shown (the rest are display:none
+           via the :has() switch above). Node cards follow in DOM order 1..N so
+           layerReveal pops them clockwise from 12 o'clock; center_label is last
+           in the DOM and pops in after the ring is drawn. Each arc PATH carries
+           its own arrowhead chevron at the end (two short relative segments), so
+           drawOn draws the line then the arrowhead last. Arc radius 300, trimmed
+           at both ends so each arrow floats in the gap between two cards. -->
+      <div class="cycle-stage">
+        <svg class="cycle-arcs" viewBox="0 0 820 760" aria-hidden="true">
+          <!-- 3 stages: hops 0->120, 120->240, 240->360 (arc 36deg..84deg etc.) -->
+          <g class="arcs-3">
+            <path class="arc" d="M 586 157 A 300 300 0 0 1 708 369 l -14.4 -16.6 M 708 369 l 10.7 -19.2"/>
+            <path class="arc" d="M 532 674 A 300 300 0 0 1 288 674 l 21.6 -4.2 M 288 674 l 11.3 18.9"/>
+            <path class="arc" d="M 112 369 A 300 300 0 0 1 234 157 l -7.2 20.8 M 234 157 l -22.0 0.4"/>
+          </g>
+          <!-- 4 stages: hops 0->90, 90->180, 180->270, 270->360 (arc 28deg..62deg etc.) -->
+          <g class="arcs-4">
+            <path class="arc" d="M 551 135 A 300 300 0 0 1 675 259 l -19.6 -10.0 M 675 259 l 2.7 -21.8"/>
+            <path class="arc" d="M 675 541 A 300 300 0 0 1 551 665 l 10.0 -19.6 M 551 665 l 21.8 2.7"/>
+            <path class="arc" d="M 269 665 A 300 300 0 0 1 145 541 l 19.6 10.0 M 145 541 l -2.7 21.8"/>
+            <path class="arc" d="M 145 259 A 300 300 0 0 1 269 135 l -10.0 19.6 M 269 135 l -21.8 -2.7"/>
+          </g>
+          <!-- 5 stages: hops 0->72, 72->144, 144->216, 216->288, 288->360 (arc 22deg..50deg etc.) -->
+          <g class="arcs-5">
+            <path class="arc" d="M 522 122 A 300 300 0 0 1 640 207 l -21.3 -5.7 M 640 207 l -1.9 -21.9"/>
+            <path class="arc" d="M 709 421 A 300 300 0 0 1 664 559 l -1.1 -22.0 M 664 559 l 20.3 -8.6"/>
+            <path class="arc" d="M 483 691 A 300 300 0 0 1 338 691 l 20.5 -7.9 M 338 691 l 14.4 16.6"/>
+            <path class="arc" d="M 156 559 A 300 300 0 0 1 111 421 l 13.8 17.1 M 111 421 l -11.3 18.9"/>
+            <path class="arc" d="M 180 207 A 300 300 0 0 1 298 122 l -12.0 18.5 M 298 122 l -21.4 -4.9"/>
+          </g>
+        </svg>
+
+        {{#stage1_label}}<div class="node n1 card fill-1">
+          <span class="node-label">{{stage1_label}}</span>
+          <span class="node-desc">{{stage1_desc}}</span>
+        </div>{{/stage1_label}}
+        {{#stage2_label}}<div class="node n2 card fill-2">
+          <span class="node-label">{{stage2_label}}</span>
+          <span class="node-desc">{{stage2_desc}}</span>
+        </div>{{/stage2_label}}
+        {{#stage3_label}}<div class="node n3 card fill-3">
+          <span class="node-label">{{stage3_label}}</span>
+          <span class="node-desc">{{stage3_desc}}</span>
+        </div>{{/stage3_label}}
+        {{#stage4_label}}<div class="node n4 card fill-4">
+          <span class="node-label">{{stage4_label}}</span>
+          <span class="node-desc">{{stage4_desc}}</span>
+        </div>{{/stage4_label}}
+        {{#stage5_label}}<div class="node n5 card fill-5">
+          <span class="node-label">{{stage5_label}}</span>
+          <span class="node-desc">{{stage5_desc}}</span>
+        </div>{{/stage5_label}}
+
+        {{#center_label}}<div class="cycle-center">
+          <span class="tag">{{center_label}}</span>
+        </div>{{/center_label}}
+      </div>
+    </main>
+
+    <footer class="canvas-footer">
+      <span class="handle">{{attribution}}</span>
+      <span>{{type_label}}</span>
+    </footer>
+  </div>
+
+  <script>
+    /* Animation spec — composes shared primitives from window.__thothMotion,
+       which render.js injects in GIF mode. Static PNG mode never calls build(),
+       so the card renders in its final resting state from CSS.
+
+       Signature beat: the title block rises in, the nodes pop clockwise from 12
+       o'clock (layerReveal stagger over DOM order 1..N), the connecting arcs
+       draw themselves around the loop staggered to follow the nodes (drawOn,
+       which also draws each arrowhead chevron last), then the center word pops,
+       footer last. One reveal primitive per element group — no overlapping
+       opacity tweens — matching the rest of the family. The hidden arc sets are
+       display:none, so M.drawOn only ever measures the visible loop. */
+    window.__thothAnim = {
+      duration: 5.4,
+      build: function (gsap) {
+        var M = window.__thothMotion, tl = gsap.timeline({ paused: true });
+        M.fadeUp(gsap, tl, '.canvas-header', 0.15, { y: -24, duration: 0.5 });
+        M.fadeUp(gsap, tl, '.cycle-headline', 0.45, { y: 28, duration: 0.55 });
+        M.layerReveal(gsap, tl, '.pill', 0.95, { scaleFrom: 0.5, duration: 0.4 });
+        M.fadeUp(gsap, tl, '.cycle-sub', 1.15, { y: 16, duration: 0.5 });
+        // Nodes pop clockwise from 12 o'clock (DOM order 1..N).
+        M.layerReveal(gsap, tl, '.node', 1.55, {
+          scaleFrom: 0.4, origin: '50% 50%', duration: 0.5, stagger: 0.35
+        });
+        // Arcs draw around the loop, staggered to trail the nodes. Only the
+        // visible arc set (matching arity) is present in the DOM flow.
+        M.drawOn(gsap, tl, '.arc', 2.0, { duration: 0.6, stagger: 0.35 });
+        // The loop word punches in after the ring is drawn.
+        M.layerReveal(gsap, tl, '.cycle-center', 4.3, { scaleFrom: 0.5, duration: 0.45 });
+        M.fadeUp(gsap, tl, '.canvas-footer', 4.85, { duration: 0.5 });
+        return tl;
+      }
+    };
+  </script>
+</body>
+</html>

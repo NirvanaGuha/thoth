@@ -2,28 +2,47 @@
 <!--
   Thoth single-image template: stat-card
   Best for: a single striking number from a post — research, result, scale.
+  Re-skinned to the shared "sticker" component kit (matches steps-card): the
+  number leads, mounted as the hero inside one prominent filled+outlined card.
   Content fields (from render.js):
+    eyebrow        optional   small uppercase caption above the lockup
+    headline       optional   title line; pairs with {{pill}} to form a lockup
+    pill           optional   one word punched into a display pill (needs headline)
     stat           required   the number itself (e.g. "73%", "12B", "4.2x")
     caption        required   what the number describes (target 6–14 words)
     context        optional   secondary line — source / qualifier (target 4–10 words)
-    eyebrow        optional   small caption above stat
+    type_label     optional   footer genre label (e.g. "Stat")
     attribution    optional   default: {{handle}}
+
+  The optional {{#headline}} lockup mirrors steps-card; when omitted the eyebrow
+  sits straight above the hero card. The stat rolls 0 -> target via countUp.
 -->
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <style>{{tokens_css}}{{base_css}}
+    .stat-lockup { max-width: 940px; margin-bottom: var(--space-4); }
+    /* Hero sticker card — the number lives here, bolder/cleaner than steps. */
+    .stat-card-hero {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: var(--space-3);
+      padding: var(--space-6) var(--space-5);
+    }
     .stat-display {
       color: var(--brand-accent);
-      margin-bottom: var(--space-3);
+      font-size: 200px;
+      line-height: 0.92;
+      letter-spacing: -0.04em;
     }
     .stat-caption {
-      max-width: 900px;
+      max-width: 820px;
+      line-height: var(--leading-tight);
     }
-    .stat-context {
-      margin-top: var(--space-4);
-      color: var(--brand-muted);
-    }
+    /* Context rides as a dashed tag inside the card, echoing steps-card tags. */
+    .stat-context { margin-top: var(--space-1); }
+    .stat-context:empty { display: none; }
   </style>
 </head>
 <body>
@@ -34,9 +53,15 @@
     </header>
 
     <main style="flex: 1; display: flex; flex-direction: column; justify-content: center;">
-      <p class="text-display stat-display">{{stat}}</p>
-      <p class="text-headline-sm stat-caption">{{caption}}</p>
-      {{#context}}<p class="text-body stat-context">{{context}}</p>{{/context}}
+      {{#headline}}<h1 class="text-headline stat-lockup lockup">
+        <span>{{headline}}</span>{{#pill}} <span class="pill">{{pill}}</span>{{/pill}}
+      </h1>{{/headline}}
+
+      <div class="stat-card-hero card fill-1">
+        <p class="text-display stat-display">{{stat}}</p>
+        <p class="text-headline-sm stat-caption">{{caption}}</p>
+        {{#context}}<span class="tag stat-context">{{context}}</span>{{/context}}
+      </div>
     </main>
 
     <footer class="canvas-footer">
@@ -44,5 +69,26 @@
       <span>{{type_label}}</span>
     </footer>
   </div>
+
+  <script>
+    /* Animation spec — composes shared primitives from window.__thothMotion,
+       which render.js injects in GIF mode. Static PNG mode never calls build(),
+       so the card renders in its final resting state from CSS + the {{stat}} value. */
+    window.__thothAnim = {
+      duration: 5.0,
+      build: function (gsap) {
+        var M = window.__thothMotion, tl = gsap.timeline({ paused: true });
+        M.fadeUp(gsap, tl, '.canvas-header', 0.15, { y: -24, duration: 0.5 });
+        M.fadeUp(gsap, tl, '.stat-lockup', 0.5, { y: 28, duration: 0.55 });
+        M.layerReveal(gsap, tl, '.pill', 0.95, { scaleFrom: 0.5, duration: 0.4 });
+        M.colorWave(gsap, tl, '.stat-card-hero', 1.1, { duration: 0.6, from: 0 });
+        M.countUp(gsap, tl, '.stat-display', 1.45, { duration: 1.9 });
+        M.fadeUp(gsap, tl, '.stat-caption', 3.0, { y: 24, duration: 0.55 });
+        M.fadeUp(gsap, tl, '.stat-context', 3.55, { y: 16, duration: 0.5 });
+        M.fadeUp(gsap, tl, '.canvas-footer', 4.3, { duration: 0.5 });
+        return tl;
+      }
+    };
+  </script>
 </body>
 </html>

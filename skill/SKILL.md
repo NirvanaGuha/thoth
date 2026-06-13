@@ -1,6 +1,6 @@
 ---
 name: thoth
-version: 1.4.0
+version: 1.5.0
 description: Build and maintain a unique, consistent LinkedIn voice for one or more users. Runs a framework-driven persona interview (brand archetypes + tone spectrum + hot-take exercises), then generates ready-to-publish LinkedIn posts across a 30/25/20/15/10 content mix (Personal / Work / Thought-leadership / Educational / Promotional). Handles multi-user installs — teams, agencies, or families can share one install with a persona per person. Trigger on any `/thoth` command, on phrases like "write a LinkedIn post", "draft a post for [name]", "help me sound more like myself on LinkedIn", "onboard me on Thoth", "set up my LinkedIn voice", or when the user asks for help building a personal brand / thought leadership on LinkedIn. Also trigger when the user references their own posting cadence, content calendar, or wants to regenerate a post. Use this skill instead of writing a generic LinkedIn post whenever the user has a Thoth persona on file.
 ---
 
@@ -90,8 +90,8 @@ All commands are of the form `/thoth [subcommand] [args...]`. The `<name>` arg a
 | `/thoth schedule [HH:MM]` | Set up a recurring daily run that writes a draft to `inbox/` and pings the user. Default 08:30 local time. |
 | `/thoth unschedule` | Cancel the recurring schedule. |
 | `/thoth inbox` | List drafts produced by scheduled runs that are awaiting review. `/thoth inbox <date>` opens a specific one; `/thoth inbox accept` / `reject` / `regenerate` handles a draft. |
-| `/thoth image [<date>] [--variant <name>]` | Render the post as a single 1200×1200 PNG. Auto-picks variant from content; override with `--variant quote\|stat\|headline`. Output to `<data-root>/exports/`. |
-| `/thoth brand` | View / edit the active persona's visual identity (`brand.yaml`). First run walks a 2-minute interview with sensible defaults. |
+| `/thoth image [<date>] [--variant <name>]` | Render the post as an animated GIF (portrait 1080×1350, inside LinkedIn's <5 MB / <400-frame envelope). Auto-picks the template from content; override with `--variant`. Pass a `.png` output for a static frame. Output to `<data-root>/exports/`. |
+| `/thoth brand` | View / edit the active persona's visual identity (`brand.yaml`). First run auto-derives it from the persona's archetype + tone (no interview); `/thoth brand setup` runs the explicit colour interview. |
 | `/thoth recover` | Scan past Claude session logs for persona content and restore it to the current data root. Use after an upgrade that wiped your persona data (e.g. `amskills update` from a v1.0.x install). |
 | `/thoth update` | Check for a newer Thoth release and upgrade in place. Persona data is independent of the skill folder — never touched. |
 | `/thoth version` | Print the installed Thoth version and where the skill + data live. |
@@ -135,11 +135,40 @@ Selection runs in four ordered steps before drafting begins. The full algorithm 
    - The framework's default arc from `story-arcs.md`.
    - The hook pattern's `Shape` block from `hook-patterns.md`.
 8. **Run the voice check** (see below) before emitting. One extra item in v1.2.0: *"Does the draft actually follow the chosen framework's shape, or did it slide into a generic Classic arc?"*
-9. **Output** only the post text, with a final one-line meta footer:
+9. **Emit** the post text, with a final one-line meta footer:
    ```
    — type: <type> • framework: <framework> • hook: <hook> • topic: <short> • ~<wordcount> words
    ```
 10. **Log** the new row to `history.yaml` with `date`, `type`, `framework`, `hook_pattern`, `topic`, `wordcount`, and save the draft to `personas/<active>/last-post.md` for regenerate.
+11. **Attach a GIF infographic — automatic** (skip only if the user passed `--no-image`). The generated post ships with a matching animated GIF. **The infographic must visualize the post's core POV — not decorate it.** Before choosing anything, name the post's central claim in one sentence (usually its hook/thesis); the card exists to make *that* land at a glance.
+    1. **Ensure a brand.** If `personas/<active>/brand.yaml` is missing, auto-derive it (no interview) by running `derive-brand.js` against `persona.md` — see the `/thoth brand` default-behavior step. Explicit user colours, if any, override.
+    2. **Pick the infographic type by the SHAPE OF THE POV** — match the form to how the argument is built, not to surface keywords:
+       - one **magnitude / result** (a single number *is* the point) → `stat-card`
+       - a **trend over time** (growth, a rising/falling curve) → `line-chart-card`
+       - a **before/after or size gap** (a few values to weigh) → `bar-chart-card`
+       - **2–3 options compared** across attributes (which to pick) → `comparison-card`
+       - a **sequence of steps** (a how-to, "N things" in order) → `steps-card`
+       - a **process with flow** (stages connected, cause→effect, branching) → `flowchart-card`
+       - a **repeating loop** (a cycle that feeds itself) → `cycle-card`
+       - a **chronology** (milestones, an evolution over time) → `timeline-card`
+       - **depth / hierarchy** (nested levels, what's underneath) → `layers-card`
+       - a **funnel or pyramid** (tiers that narrow) → `funnel-card`
+       - **overlapping factors → an intersection** (the sweet spot) → `venn-card`
+       - **two axes / four quadrants** (position on two dimensions) → `matrix-card`
+       - a **position on a range** (this ↔ that, where things fall) → `spectrum-card`
+       - a **collection of N ideas** (an unordered set / examples) → `grid-card`
+
+       If two fit, pick the one that dramatizes the *tension* in the POV. If none fit cleanly, skip rather than force it (or fall back to a static `headline-card`/`quote-card`).
+    3. **Extract the POV into the template's fields** — the headline carries the post's central claim (often the hook), and the body elements are the *structure that proves it*, in the post's own words. Pull the punchiest 2–4 words as the pill/emphasis. The test: someone who reads **only the card** should walk away with the POV. Write the `content.json` to a temp file. (Per-template field rules are in `/thoth image`.)
+    4. **Render the GIF** with the persona's `brand.yaml` via `render.js`, using a `.gif` output (portrait 1080×1350, inside LinkedIn's envelope):
+       ```sh
+       node ~/.claude/skills/thoth/scripts/render.js \
+         --template <template> \
+         --content /tmp/thoth-content-<rand>.json \
+         --brand <data-root>/personas/<active>/brand.yaml \
+         --out <data-root>/exports/<date>-image-<template>.gif
+       ```
+    5. **Present the post text PLUS the GIF path** as the attachment, and append the `exports:` row to `history.yaml` (same shape as `/thoth image`). Honor the image hard rules in `/thoth image`.
 
 ### `/thoth daily`
 
@@ -320,7 +349,7 @@ After listing, clear `<data-root>/inbox/_unread`.
 
 ### `/thoth image [<date>] [--variant <name>]` — render a single image
 
-Renders a 1200×1200 PNG from a post draft. Square aspect ratio (LinkedIn-friendly). Uses `skill/scripts/render.js` (Puppeteer-core + system Chrome).
+Renders an **animated GIF** from a post draft, at **portrait 1080×1350 (4:5)** — LinkedIn's max feed real estate. The GIF is held inside LinkedIn's animation envelope (**under 5 MB, under 400 frames**); `render.js` logs `LinkedIn envelope: frames/size OK` and exits non-zero if either limit is breached. Output mode is chosen by the `--out` extension: a `.gif` path renders the animation; a `.png` path still renders a single static frame instead. Uses `skill/scripts/render.js` (Puppeteer-core + system Chrome; GIF encoding via gifski if installed, else ffmpeg two-pass palette).
 
 **Resolve the source draft:**
 
@@ -328,24 +357,44 @@ Renders a 1200×1200 PNG from a post draft. Square aspect ratio (LinkedIn-friend
 2. Else → read `<data-root>/personas/<active>/last-post.md`.
 3. If neither exists, tell the user and stop.
 
-**Pick the variant** unless `--variant` was passed:
+**Pick the template** unless `--variant` was passed. The 14 animated templates and what each is best for:
 
-| Source content signal | Variant |
-|---|---|
-| Draft contains a striking number with a clear claim attached (e.g. "3×", "73%", "$1.4M") | `stat-card` |
-| Draft opens with a strong claim that can be compressed to ≤120 chars | `headline-card` |
-| Draft contains a pull-quote-worthy line (high signal, 80–180 chars, stands alone) | `quote-card` |
-| Default fallback | `headline-card` |
+| Source content signal | Template | Best for |
+|---|---|---|
+| A single striking number with a claim (e.g. "3×", "73%", "$1.4M") | `stat-card` | One big number that counts up |
+| A trend / growth over time (a rising or falling curve) | `line-chart-card` | A line+area curve that draws in + a count-up result |
+| A before/after or size gap (a few values to weigh) | `bar-chart-card` | Bars that grow + count-up |
+| 2–3 options compared across attributes (which to pick) | `comparison-card` | A decision table with an accent "winner" column |
+| A numbered list / "N things" / "N ways" in order | `steps-card` | Numbered sticker cards with a pill lockup |
+| A process with flow (stages, cause→effect, branching) | `flowchart-card` | Node boxes joined by drawn-in arrows |
+| A repeating loop / cycle that feeds itself | `cycle-card` | Stages around a ring with looping arrows |
+| A chronology / milestones / an evolution | `timeline-card` | A vertical timeline of dated events |
+| A layered or nested framework (depth, what's underneath) | `layers-card` | Concentric framework rings |
+| A funnel or pyramid (tiers that narrow) | `funnel-card` | Stacked width-stepped tiers |
+| Two overlapping factors → an intersection (the sweet spot) | `venn-card` | Overlapping circles with a center insight |
+| Two axes / four quadrants (position on two dimensions) | `matrix-card` | A 2×2 with an accent "winner" quadrant |
+| A position on a range (this ↔ that, where things fall) | `spectrum-card` | Markers placed along an axis |
+| A collection of N ideas / examples (unordered) | `grid-card` | A grid of idea cards with a colour sweep |
 
-**Extract content for the chosen variant.** This is the interesting step — the framework already gives you the shape:
+Legacy static templates `headline-card` and `quote-card` still render (they have no animation timeline, so they always produce a static frame regardless of the `--out` extension). Use them when the post is a single compressed claim or a standalone pull-quote and motion would add nothing.
 
-- **headline-card:** the framework's first beat ("Claim" for thought-leadership, "Hook" for personal, "Decision" for work, etc.). Compress to ≤120 chars without losing the conviction. The optional `subhead` is the second beat compressed to a line.
-- **quote-card:** find the most quotable line in the draft — usually the framework's "stake," "landing," "reframe," or close. Trim to 80–180 chars. Quote should stand alone without context.
-- **stat-card:** identify the strongest single number in the draft + a 6–14 word caption + optional 4–10 word context. If no clear number, fall back to `headline-card`.
+**Extract content for the chosen template.** Each template's exact content fields are documented in its header comment (`templates/single-image/<template>.html.tmpl`); map the POV into those fields so the card alone conveys the argument. Principles by family:
+
+- **Number / chart** (`stat-card`, `line-chart-card`, `bar-chart-card`): pull the strongest figure(s) + a short caption; for charts, the compared values or the trend's points plus the headline result. If there's no real number, pick a non-chart template.
+- **List / process** (`steps-card`, `flowchart-card`, `timeline-card`, `cycle-card`): pull the ordered items (each a short label + optional one-line detail) in the draft's own order or flow.
+- **Structure / relationship** (`layers-card`, `funnel-card`, `venn-card`, `matrix-card`, `spectrum-card`, `comparison-card`, `grid-card`): pull the levels / tiers / circles / quadrants / options / items as short labels, and put the punchline where the template has a focal point (the center, the winner, the peak).
+- **headline-card** (static): the framework's first beat ("Claim" for thought-leadership, "Hook" for personal, "Decision" for work, etc.). Compress to ≤120 chars without losing the conviction. The optional `subhead` is the second beat compressed to a line.
+- **quote-card** (static): find the most quotable line in the draft — usually the framework's "stake," "landing," "reframe," or close. Trim to 80–180 chars. Quote should stand alone without context.
 
 **Resolve brand config:**
 
-1. Read `<data-root>/personas/<active>/brand.yaml`. If missing, run `/thoth brand` first (interactively offer it: *"No brand profile for this persona yet. Set one up now? (yes/skip — defaults will be used either way.)"*).
+1. Read `<data-root>/personas/<active>/brand.yaml`. If missing, **auto-derive it** by running `derive-brand.js` against the persona's `persona.md` (no interview — see `/thoth brand`), then continue:
+   ```sh
+   node ~/.claude/skills/thoth/scripts/derive-brand.js \
+     --persona <data-root>/personas/<active>/persona.md \
+     --handle "@<handle>" \
+     --out <data-root>/personas/<active>/brand.yaml
+   ```
 
 **Write the content JSON** to a temp file (`/tmp/thoth-content-<rand>.json`):
 
@@ -359,45 +408,62 @@ Renders a 1200×1200 PNG from a post draft. Square aspect ratio (LinkedIn-friend
 }
 ```
 
-**Render via the script:**
+**Render via the script.** Use a `.gif` output for the animated templates (the default); pass a `.png` output only when you deliberately want a static frame:
 
 ```sh
 node ~/.claude/skills/thoth/scripts/render.js \
-  --template <variant> \
+  --template <template> \
   --content /tmp/thoth-content-<rand>.json \
   --brand <data-root>/personas/<active>/brand.yaml \
-  --out <data-root>/exports/<date>-image-<variant>.png
+  --out <data-root>/exports/<date>-image-<template>.gif
 ```
 
-The script's first-time install of `puppeteer-core` into `~/.thoth/cache/render/` takes ~30 seconds and only happens once. After that, each render is <2 seconds.
+`brand.yaml` is auto-derived (see the resolve step above) if the persona doesn't have one yet. The script's first-time install of `puppeteer-core` + `gsap` into `~/.thoth/cache/render/` takes ~30 seconds and only happens once. After that, a static PNG renders in <2 seconds; an animated GIF takes longer (it seeks and captures every frame).
 
 **Output:**
 
-- The PNG at `<data-root>/exports/<date>-image-<variant>.png`.
+- The GIF at `<data-root>/exports/<date>-image-<template>.gif` (or a `.png` if you passed a static output).
 - A debug HTML at the same path with `.html` extension — opens in any browser for visual inspection.
 - Append to history.yaml row's `exports:` block:
   ```yaml
   exports:
-    - format: image
-      variant: headline-card
-      path: ~/.thoth/exports/2026-05-25-image-headline-card.png
+    - format: gif
+      template: stat-card
+      path: ~/.thoth/exports/2026-05-25-image-stat-card.gif
       generated_at: 2026-05-25T11:14:00Z
   ```
 - Show the user the output path and offer to open it: *"Rendered. Open the file? (`open ~/.thoth/exports/<file>`)"*
 
 **Hard rules for image rendering:**
 
-- **Never embed promotional content** in image text unless the source draft is Promotional type. Image rendering doesn't change the post-type rules — a Personal-type post with a stat-card variant is still Personal in tone and content.
+- **Never embed promotional content** in image text unless the source draft is Promotional type. Image rendering doesn't change the post-type rules — a Personal-type post rendered as a stat-card is still Personal in tone and content.
 - **Don't render a draft that's pending-review** unless the user explicitly approved with `/thoth inbox accept` first. The reasoning: pinning a still-being-reviewed draft into a rendered artifact muddies what's actually approved.
-- **Never overwrite an existing render.** If `<date>-image-<variant>.png` exists, append `-2`, `-3`, etc.
+- **Never overwrite an existing render.** If `<date>-image-<template>.gif` (or `.png`) exists, append `-2`, `-3`, etc.
 
 ### `/thoth brand` — view / edit the persona's visual identity
 
 Reads + edits `<data-root>/personas/<active>/brand.yaml`. Schema documented in `references/brand-template.md`.
 
-**No arguments — view mode:**
+**Default first-run behavior — auto-derive (no interview):**
 
-1. Read the active persona's brand.yaml. If missing, show: *"No brand profile yet. Run `/thoth brand setup` to create one."*
+When the active persona has **no** `brand.yaml`, the default is to **derive one automatically from the persona's personality** — no interview, no questions. Run:
+
+```sh
+node ~/.claude/skills/thoth/scripts/derive-brand.js \
+  --persona <data-root>/personas/<active>/persona.md \
+  --handle "@<handle>" \
+  --out <data-root>/personas/<active>/brand.yaml
+```
+
+`derive-brand.js` reads the persona's dominant/secondary archetype + tone sliders and computes accent/ink/background + 5 palette swatches + card style + gradient. Then report the derived palette in one line, e.g.:
+
+> *"Derived a brand for nirvana from your archetype (magician/sage): accent `#5B3BFF`, ink `#16161F`, on a near-white background, with 5 sticker swatches. Edit it anytime with `/thoth brand setup`."*
+
+**Explicit branding always wins.** If the user supplied colours or branding instructions (e.g. "use my brand blue `#3B43FF`"), pass them as flags so they override the derivation — `--accent`, `--bg`, `--ink`, `--primary`. With no explicit colours, the palette is pure-derived.
+
+**No arguments, brand already exists — view mode:**
+
+1. Read the active persona's brand.yaml.
 2. Render a compact summary:
    ```
    Brand for nirvana
@@ -410,14 +476,14 @@ Reads + edits `<data-root>/personas/<active>/brand.yaml`. Schema documented in `
        Display       Inter
        Body          Inter
      Handle          @NirvanaGuha
-     Aspect ratio    1:1
+     Aspect ratio    4:5
 
    Edit with /thoth brand setup or directly at ~/.thoth/personas/nirvana/brand.yaml
    ```
 
-**`/thoth brand setup`** — interactive interview:
+**`/thoth brand setup`** — explicit interactive interview (opt-in override):
 
-Walk through the 5 questions documented in `references/brand-template.md`. Each question shows the current value (if any) and the default. Empty input keeps the existing value or accepts the default.
+The interview is no longer the default — it's the manual override for users who want to set colours by hand instead of (or on top of) the derived palette. Walk through the 5 questions documented in `references/brand-template.md`. Each question shows the current value (if any) and the default. Empty input keeps the existing value or accepts the default.
 
 ```
 1/5  Primary color (headline + body)?
@@ -425,7 +491,7 @@ Walk through the 5 questions documented in `references/brand-template.md`. Each 
      >
 ```
 
-After all 5 questions, write the file and offer a test render: *"Want me to render a sample card now so you can see how it looks? (yes/no)"* — on yes, generate a headline-card from `last-post.md` (or a placeholder if no posts yet).
+After all 5 questions, write the file and offer a test render: *"Want me to render a sample card now so you can see how it looks? (yes/no)"* — on yes, generate a stat-card GIF from `last-post.md` (or a placeholder if no posts yet).
 
 **`/thoth brand reset`** — restore defaults:
 

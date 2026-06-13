@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<!--
+  Thoth single-image template: spectrum-card  (sticker re-skin)
+  Best for: a "positional spectrum / range" post — place 2-4 items along ONE
+  axis running between two opposing poles (this <-> that, or low -> high) so the
+  reader sees WHERE each thing falls relative to the others at a glance.
+  (cf. catalog "Spectrum"; the tone-spectrum "Formal <-> Casual" style ruler.)
+
+  Re-skinned to match the steps-card "sticker" aesthetic: a headline .lockup with
+  the punchy word punched into a .pill, a .subtitle, then a full-width horizontal
+  axis line (inline SVG, drawn on by M.drawOn) with the two pole labels pinned at
+  its ends. Each item is a marker dot pinned at its position along the axis, with
+  its label riding in a small sticker .card that alternates ABOVE / BELOW the axis
+  to avoid collisions. One item may be flagged for accent emphasis (its marker +
+  label flip to the brand accent). All colour is token-driven so a persona's
+  brand.yaml restyles it together with steps-card / matrix-card / the siblings.
+
+  Content fields (from render.js):
+    eyebrow        optional   small uppercase caption above the headline
+    headline       required   the framing claim / question (target 18-46 chars)
+    pill           optional   one punchy word punched into the lockup pill
+                              (e.g. "IRRESISTIBLE") — keep it short
+    subhead        optional   one muted line under the lockup
+
+    left_label     required   the LEFT pole (low end / "from" — e.g. "Ignored")
+    right_label    required   the RIGHT pole (high end / "to" — e.g. "Irresistible")
+
+    item1_label    required   FIRST item placed on the axis
+    item1_pos      required   item1 position 0-100 (percent along the axis,
+                              0 = at the left pole, 100 = at the right pole).
+                              KEEP roughly in 12-88 so the centered label card
+                              stays on-canvas (see POSITIONING note below).
+    item2_label..item4_label  optional more items (fixed slots, 2-4 total)
+    item2_pos..item4_pos      matching 0-100 positions for each present item
+
+    item1_accent..item4_accent  optional truthy on AT MOST ONE item -> that
+                              marker + its label flip to the brand accent for
+                              emphasis (the "this is where you want to be" point)
+
+    type_label     optional   footer genre label (e.g. "Thought-leadership")
+    attribution    optional   default: the persona handle
+
+  Each item is a FIXED slot wrapped in a SINGLE itemN_label conditional section;
+  the pos + accent flag inside it are plain variable substitutions.
+  Render only the filled items (a 2-3 item spectrum just omits item3/item4). The
+  accent flag renders into a data-accent attribute the CSS keys off.
+
+  POSITIONING — the axis spans the FULL track width (no side chips eat the band),
+  so a 220px-wide centered label stays on-canvas for positions ~12-88%. Each item
+  lives in an absolutely-positioned WRAPPER pinned at left:itemN_pos percent on the
+  relatively-positioned track, centered on that point via translateX(-50%). The
+  wrapper itself is NEVER animated (so GSAP's transform writes can't clobber its
+  -50% centering — the same defensive split matrix-card uses for its rotated axis
+  box); only the marker dot + label card inside it animate. Items alternate side
+  via .above / .below (odd slots above, even slots below) so adjacent labels never
+  stack on the same side; the label card is width-capped + wrap-enabled so a long
+  label grows DOWN, never off-canvas. Place items left->right in pos order and
+  spread them so same-side labels (1 & 3, or 2 & 4) don't overlap.
+
+  AXIS LINE — inline <svg> with a single <line class="axis">; M.drawOn animates
+  its stroke-dashoffset so the line draws itself left -> right. vector-effect:
+  non-scaling-stroke keeps the stroke weight constant while the SVG stretches to
+  the track width. The line is the resting (final) look, so the static PNG shows
+  a full axis with no JS. (line.getTotalLength() is what M.drawOn measures — a
+  bare <line> supports it, so the dash draw works.)
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <style>{{tokens_css}}{{base_css}}
+    .spec-headline { max-width: 940px; margin-bottom: var(--space-2); }
+    .spec-sub { margin-bottom: var(--space-6); }
+
+    /* The track: full-width, relatively-positioned so item wrappers + pole
+       labels pin against it. Tall enough to hold one row of label cards above
+       the axis and one below; the axis line sits at the vertical middle. */
+    .spec-track {
+      position: relative;
+      width: 100%;
+      height: 580px;
+    }
+
+    /* The axis line at the vertical middle of the track. The inline SVG stretches
+       to the full track width; the <line> spans it edge to edge. */
+    .spec-axis-wrap {
+      position: absolute;
+      left: 0; right: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      height: 12px;
+    }
+    .spec-axis-wrap svg { display: block; width: 100%; height: 100%; }
+    .axis {
+      stroke: var(--brand-ink);
+      fill: none;
+      stroke-width: 6;
+      stroke-linecap: round;
+      vector-effect: non-scaling-stroke;   /* constant weight while SVG stretches */
+    }
+
+    /* Pole labels pinned at the two ends of the axis, just below the line so they
+       read as the axis endpoints. Sticker tags so the extremes frame the ruler.
+       z-index 3 keeps the chip above any item dot/stem (z 1-2): a .below item
+       placed near a pole drops a connector stem into the pole's vertical band, and
+       the solid chip should cover that hairline rather than have it paint on top. */
+    .pole {
+      position: absolute;
+      top: calc(50% + var(--space-3));
+      z-index: 3;
+      max-width: 300px;
+      padding: var(--space-2) var(--space-3);
+      border-radius: 16px;
+      background: var(--brand-bg);
+      border: var(--card-stroke-w) solid var(--card-stroke);
+      box-shadow: 0 5px 0 var(--card-shadow);
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: 30px;
+      line-height: 1.05;
+      letter-spacing: -0.01em;
+      color: var(--brand-ink);
+      overflow-wrap: anywhere;
+    }
+    .pole.left  { left: 0;  text-align: left; }
+    .pole.right { right: 0; text-align: right; }
+
+    /* Each item wrapper: pinned at its pos% and centered on that point. NEVER
+       animated (so its -50% centering survives GSAP transform writes); the
+       marker dot + label card inside it carry the motion. Spans the full track
+       height with the axis at its vertical middle, so .above / .below place the
+       label in the correct half. */
+    .item {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 50%;                            /* overridden inline to left:itemN_pos percent */
+      transform: translateX(-50%);
+      width: 220px;                         /* label card width cap; dot is centered in it */
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    /* The label card — a kit sticker tile with the item name. Width-capped by the
+       wrapper; long labels wrap DOWN instead of off-canvas. */
+    .item-label {
+      width: 100%;
+      box-sizing: border-box;
+      text-align: center;
+      padding: var(--space-2);
+      border-radius: 16px;
+      background: var(--card-fill, var(--swatch-1));
+      border: var(--card-stroke-w) solid var(--card-stroke);
+      box-shadow: 0 5px 0 var(--card-shadow);
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 24px;                  /* fits "Personalized"-length words on one line in the 220px card */
+      line-height: var(--leading-tight);
+      letter-spacing: -0.02em;
+      color: var(--brand-ink);
+      overflow-wrap: break-word;        /* break only when truly necessary, at word edges — never mid-word like "anywhere" did */
+    }
+
+    /* The marker dot sits ON the axis (the track's vertical middle). A short
+       connector stem joins the label card to the dot so the eye links them. */
+    .item-dot {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 34px; height: 34px;
+      border-radius: 50%;
+      background: var(--swatch-1);
+      border: var(--card-stroke-w) solid var(--card-stroke);
+      box-shadow: 0 4px 0 var(--card-shadow);
+      z-index: 2;
+    }
+    .item-stem {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      width: var(--card-stroke-w);
+      background: var(--card-stroke);
+      z-index: 1;
+    }
+
+    /* ABOVE: label rides the top half, stem drops from the label to the axis. */
+    .item.above .item-label { margin-bottom: auto; }
+    .item.above .item-stem  { top: 110px; bottom: 50%; }
+    /* BELOW: label rides the bottom half, stem rises from the axis to the label. */
+    .item.below .item-label { margin-top: auto; }
+    .item.below .item-stem  { top: 50%; bottom: 110px; }
+
+    /* Per-item swatch fill on the label + dot, cycling the persona palette like
+       steps-card colour-codes its rows. The resting state IS the final look. */
+    .item.i1 .item-label { --card-fill: var(--swatch-1); } .item.i1 .item-dot { background: var(--swatch-1); }
+    .item.i2 .item-label { --card-fill: var(--swatch-2); } .item.i2 .item-dot { background: var(--swatch-2); }
+    .item.i3 .item-label { --card-fill: var(--swatch-3); } .item.i3 .item-dot { background: var(--swatch-3); }
+    .item.i4 .item-label { --card-fill: var(--swatch-4); } .item.i4 .item-dot { background: var(--swatch-4); }
+
+    /* The accent item flips to the brand accent so the "land here" point reads at
+       a glance (ink text stays legible on the accent fill, like matrix-card's
+       winning quadrant + bar-chart's accent bar). */
+    .item[data-accent="true"] .item-label,
+    .item[data-accent="1"] .item-label {
+      --card-fill: var(--brand-accent);
+      color: var(--brand-bg);
+    }
+    .item[data-accent="true"] .item-dot,
+    .item[data-accent="1"] .item-dot {
+      background: var(--brand-accent);
+      width: 42px; height: 42px;
+    }
+  </style>
+</head>
+<body>
+  <div class="canvas">
+    <header class="canvas-header">
+      {{#eyebrow}}<span class="text-caption">{{eyebrow}}</span>{{/eyebrow}}
+      <span class="accent-dot"></span>
+    </header>
+
+    <main style="flex: 1; display: flex; flex-direction: column; justify-content: center; min-height: 0;">
+      <h1 class="text-headline spec-headline lockup">
+        <span>{{headline}}</span>{{#pill}} <span class="pill">{{pill}}</span>{{/pill}}
+      </h1>
+      {{#subhead}}<p class="subtitle spec-sub">{{subhead}}</p>{{/subhead}}
+
+      <div class="spec-track">
+        <!-- The axis line draws itself left->right via M.drawOn. -->
+        <div class="spec-axis-wrap">
+          <svg viewBox="0 0 1000 6" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+            <line class="axis" x1="0" y1="3" x2="1000" y2="3"></line>
+          </svg>
+        </div>
+
+        <!-- Pole labels at the two ends of the axis. -->
+        <span class="pole left">{{left_label}}</span>
+        <span class="pole right">{{right_label}}</span>
+
+        <!-- Items pinned at left:itemN_pos percent (set inline). Slots alternate
+             .above / .below so adjacent labels never share a side. Place items
+             left->right in pos order. -->
+        {{#item1_label}}<div class="item i1 above" data-accent="{{item1_accent}}" style="left: {{item1_pos}}%;">
+          <span class="item-label">{{item1_label}}</span>
+          <span class="item-stem"></span>
+          <span class="item-dot"></span>
+        </div>{{/item1_label}}
+        {{#item2_label}}<div class="item i2 below" data-accent="{{item2_accent}}" style="left: {{item2_pos}}%;">
+          <span class="item-label">{{item2_label}}</span>
+          <span class="item-stem"></span>
+          <span class="item-dot"></span>
+        </div>{{/item2_label}}
+        {{#item3_label}}<div class="item i3 above" data-accent="{{item3_accent}}" style="left: {{item3_pos}}%;">
+          <span class="item-label">{{item3_label}}</span>
+          <span class="item-stem"></span>
+          <span class="item-dot"></span>
+        </div>{{/item3_label}}
+        {{#item4_label}}<div class="item i4 below" data-accent="{{item4_accent}}" style="left: {{item4_pos}}%;">
+          <span class="item-label">{{item4_label}}</span>
+          <span class="item-stem"></span>
+          <span class="item-dot"></span>
+        </div>{{/item4_label}}
+      </div>
+    </main>
+
+    <footer class="canvas-footer">
+      <span class="handle">{{attribution}}</span>
+      <span>{{type_label}}</span>
+    </footer>
+  </div>
+
+  <script>
+    /* Animation spec — composes shared primitives from window.__thothMotion,
+       which render.js injects in GIF mode. Static PNG mode never calls build(),
+       so the card renders in its final resting state from CSS (full axis line,
+       markers placed at their pos%, accent item already accent-tinted).
+
+       The item WRAPPERS are never targeted (their CSS translateX(-50%) centering
+       must survive); only the dots, stems, and label cards animate. The label
+       cards carry NO CSS transform, so they fadeUp normally. The dots + stems DO
+       use a CSS transform for their own centering, so they are revealed with
+       autoAlpha (opacity only, never a transform tween) so that centering stays
+       intact — same reason matrix-card targets its axis labels, not the rotated
+       box. */
+    window.__thothAnim = {
+      duration: 5.2,
+      build: function (gsap) {
+        var M = window.__thothMotion, tl = gsap.timeline({ paused: true });
+        // Title block rises in, then the pill pops, then the subhead.
+        M.fadeUp(gsap, tl, '.canvas-header', 0.15, { y: -24, duration: 0.5 });
+        M.fadeUp(gsap, tl, '.spec-headline', 0.45, { y: 28, duration: 0.55 });
+        M.layerReveal(gsap, tl, '.pill', 0.95, { scaleFrom: 0.5, duration: 0.4 });
+        M.fadeUp(gsap, tl, '.spec-sub', 1.15, { y: 16, duration: 0.5 });
+        // The axis line draws itself left -> right, then the pole labels fade up.
+        M.drawOn(gsap, tl, '.axis', 1.6, { duration: 0.85 });
+        M.fadeUp(gsap, tl, '.pole', 1.9, { y: 12, duration: 0.45, stagger: 0.12 });
+        // Items reveal left -> right. The label cards fadeUp (no CSS transform on
+        // them); the dots + stems fade in via autoAlpha so their own centering
+        // transforms are left intact. Stagger reads as a sweep along the axis.
+        M.fadeUp(gsap, tl, '.item-label', 2.55, { y: 18, duration: 0.5, stagger: 0.3 });
+        gsap.set('.item-dot, .item-stem', { autoAlpha: 0 });
+        tl.to('.item-dot, .item-stem', {
+          autoAlpha: 1, duration: 0.4, ease: 'power2.out', stagger: 0.3
+        }, 2.55);
+        // Emphasis: the accent item's dot gets one final pop. transformOrigin is
+        // pinned to its own center so the translate(-50%,-50%) centering survives
+        // the scale (GSAP composes scale onto the existing translate).
+        tl.to('.item[data-accent="true"] .item-dot, .item[data-accent="1"] .item-dot', {
+          scale: 1.35, duration: 0.3, ease: 'power2.out',
+          transformOrigin: '50% 50%', yoyo: true, repeat: 1
+        }, 4.4);
+        // Footer last.
+        M.fadeUp(gsap, tl, '.canvas-footer', 4.6, { duration: 0.5 });
+        return tl;
+      }
+    };
+  </script>
+</body>
+</html>

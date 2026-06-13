@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<!--
+  Thoth single-image template: funnel-card
+  Best for: a funnel / pyramid post — a sequence of named tiers whose WIDTH steps
+            down (or up) so the stack reads as a funnel or a pyramid silhouette.
+            (cf. catalog "Funnel/Pyramid", "Craft Your POV" funnel,
+            "5 Layers Behind OKR Execution" pyramid.)
+
+  Content fields (from render.js):
+    eyebrow        optional   small uppercase caption above the headline
+    headline       required   the title (e.g. "The retention funnel")
+    pill           optional   one word/phrase punched into the lockup's display pill
+    subhead        optional   one muted line under the lockup
+    orientation    optional   "funnel" (default) = widest tier at TOP, narrowing
+                              down. "pyramid" = widest at BOTTOM, narrowing up.
+                              HUMAN-READABLE only; the template branches on the
+                              derived boolean is_pyramid (see below).
+    is_pyramid     optional   truthy ONLY when orientation == "pyramid". Adds the
+                              .pyramid modifier that flips the width ramp. (The
+                              mustache engine can't compare strings, so a funnel
+                              vs pyramid switch needs this explicit boolean, the
+                              same pattern bar-chart-card uses for barN_accent.)
+    tier1_label    required   TOP tier label (band 1, at the top of the stack)
+    tier1_desc     optional   one short line under tier 1's label
+    tier2_label..tier5_label  optional   additional tier labels, top -> down
+    tier2_desc..tier5_desc    optional   matching one-line descriptions
+    type_label     optional   footer genre label (e.g. "Framework")
+    attribution    optional   default: {{handle}}
+
+  Renders 3–5 tiers. Each tier is a FIXED numbered slot wrapped in a single
+  {{#tierN_label}}...{{/tierN_label}} conditional, so unused slots vanish and one
+  .tier selector animates them all in DOM order (top -> bottom). The mustache
+  engine now nests, but tierN_desc stays a bare {{tierN_desc}} that collapses via
+  the .tier-desc:empty rule when absent — no inner conditional needed.
+
+  Re-skin: every band is a kit "sticker" .card — a palette SWATCH fill
+  (.fill-1..5), the kit outline (var(--card-stroke) / -w), kit corner radius
+  (var(--card-radius)) and the kit drop-shadow. A square .badge numbers each
+  tier top->down (1 = top); a bold centered label + optional muted desc sit
+  inside. Width steps per tier to draw the silhouette. Matches steps-card /
+  layers-card lockup, persona font, gradient bg, footer, and density — all
+  token-driven so a persona's brand.yaml restyles the whole family at once.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <style>{{tokens_css}}{{base_css}}
+    .funnel-headline { max-width: 880px; margin-top: var(--space-3); margin-bottom: var(--space-2); }
+    .funnel-headline .pill { font-size: 0.92em; }
+    .subtitle { margin-bottom: var(--space-4); }
+
+    /* The tier stack: centered column of width-stepped sticker bands. Centered
+       so each band's silhouette steps symmetrically around the spine. */
+    .funnel-stack {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-3);
+    }
+
+    /* One tier band. Inherits the kit sticker look from .card; the per-tier
+       .fill-N class supplies a palette swatch. Content is CENTERED so labels
+       stay legible even in the narrowest bands. Padding is tightened from the
+       kit default so five bands + gaps fit the usable height. */
+    .tier {
+      width: 100%;                       /* per-tier width set by .t1..t5 below */
+      padding: var(--space-2) var(--space-4);   /* tightened from kit default so 5 bands + gaps fit usable height */
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      overflow: hidden;
+    }
+
+    /* Badge + label ride on one centered line so even narrow bands read as a
+       single labeled chip; the desc tucks under it. */
+    .tier-head {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-2);
+      min-width: 0;
+      max-width: 100%;
+    }
+    /* Smaller than the kit default so it fits the shorter bands; still the
+       ink/bg sticker glyph used across the family. */
+    .tier .badge {
+      width: 48px; height: 48px;
+      border-radius: 14px;
+      font-size: 26px;
+    }
+    .tier-label {
+      font-family: var(--font-display);
+      font-weight: var(--weight-headline);
+      font-size: 38px;
+      line-height: 1.0;
+      letter-spacing: -0.02em;
+      color: var(--brand-ink);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
+    }
+    .tier-desc {
+      font-family: var(--font-body);
+      font-size: var(--size-caption);
+      font-weight: var(--weight-body);
+      line-height: var(--leading-normal);
+      color: var(--brand-muted);
+      margin-top: 6px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
+    }
+    /* Bare {{tierN_desc}} renders empty when absent -> collapse the line. */
+    .tier-desc:empty { display: none; }
+
+    /* FUNNEL width ramp (default): tier1 (top) widest, narrowing downward.
+       Resting state = final visible look; rowReveal/layerReveal only animate
+       transforms, so the static PNG is correct with no JS. */
+    .t1 { width: 100%; }
+    .t2 { width: 82%; }
+    .t3 { width: 64%; }
+    .t4 { width: 46%; }
+    .t5 { width: 32%; }
+
+    /* PYRAMID modifier: flip the ramp so the WIDEST band is at the BOTTOM.
+       Width is keyed off how many tiers render (the deepest filled tier must be
+       the 100%-wide base), so .pyramid reverses per render-arity. The active set
+       is selected by the body's tier-count class (.has-3 / .has-4 / .has-5),
+       set from the is_pyramid + hasN flags below. */
+    .pyramid.has-5 .t1 { width: 32%; }
+    .pyramid.has-5 .t2 { width: 46%; }
+    .pyramid.has-5 .t3 { width: 64%; }
+    .pyramid.has-5 .t4 { width: 82%; }
+    .pyramid.has-5 .t5 { width: 100%; }
+
+    .pyramid.has-4 .t1 { width: 40%; }
+    .pyramid.has-4 .t2 { width: 60%; }
+    .pyramid.has-4 .t3 { width: 80%; }
+    .pyramid.has-4 .t4 { width: 100%; }
+
+    .pyramid.has-3 .t1 { width: 50%; }
+    .pyramid.has-3 .t2 { width: 76%; }
+    .pyramid.has-3 .t3 { width: 100%; }
+  </style>
+</head>
+<body class="{{#is_pyramid}}pyramid {{/is_pyramid}}{{#has5}}has-5{{/has5}}{{#has4}}has-4{{/has4}}{{#has3}}has-3{{/has3}}">
+  <div class="canvas">
+    <header class="canvas-header">
+      {{#eyebrow}}<span class="text-caption">{{eyebrow}}</span>{{/eyebrow}}
+      <span class="accent-dot"></span>
+    </header>
+
+    <h1 class="text-headline-sm funnel-headline lockup">
+      <span>{{headline}}</span>{{#pill}} <span class="pill">{{pill}}</span>{{/pill}}
+    </h1>
+    {{#subhead}}<p class="subtitle">{{subhead}}</p>{{/subhead}}
+
+    <!-- Tier bands in DOM order TOP -> BOTTOM. tier1 = top, highest-numbered =
+         bottom. The per-tier .tN class sets the width (funnel default; .pyramid
+         flips it). The badge number is fixed per slot so it reads top->down. -->
+    <div class="funnel-stack">
+      {{#tier1_label}}<div class="tier t1 card fill-1">
+        <div class="tier-head">
+          <span class="badge">1</span>
+          <span class="tier-label">{{tier1_label}}</span>
+        </div>
+        <span class="tier-desc">{{tier1_desc}}</span>
+      </div>{{/tier1_label}}
+      {{#tier2_label}}<div class="tier t2 card fill-2">
+        <div class="tier-head">
+          <span class="badge">2</span>
+          <span class="tier-label">{{tier2_label}}</span>
+        </div>
+        <span class="tier-desc">{{tier2_desc}}</span>
+      </div>{{/tier2_label}}
+      {{#tier3_label}}<div class="tier t3 card fill-3">
+        <div class="tier-head">
+          <span class="badge">3</span>
+          <span class="tier-label">{{tier3_label}}</span>
+        </div>
+        <span class="tier-desc">{{tier3_desc}}</span>
+      </div>{{/tier3_label}}
+      {{#tier4_label}}<div class="tier t4 card fill-4">
+        <div class="tier-head">
+          <span class="badge">4</span>
+          <span class="tier-label">{{tier4_label}}</span>
+        </div>
+        <span class="tier-desc">{{tier4_desc}}</span>
+      </div>{{/tier4_label}}
+      {{#tier5_label}}<div class="tier t5 card fill-5">
+        <div class="tier-head">
+          <span class="badge">5</span>
+          <span class="tier-label">{{tier5_label}}</span>
+        </div>
+        <span class="tier-desc">{{tier5_desc}}</span>
+      </div>{{/tier5_label}}
+    </div>
+
+    <footer class="canvas-footer">
+      <span class="handle">{{attribution}}</span>
+      <span>{{type_label}}</span>
+    </footer>
+  </div>
+
+  <script>
+    /* Animation spec — composes shared primitives from window.__thothMotion,
+       which render.js injects in GIF mode. Static PNG mode never calls build(),
+       so the card renders in its final resting state from CSS.
+
+       The tiers pop in IN ORDER along the funnel's flow via a single layerReveal
+       (one reveal primitive per element group, like layers-card / steps-card —
+       no overlapping opacity tweens). .tier elements are in DOM order top ->
+       bottom: for a funnel that IS the flow (top -> down), so a forward stagger
+       is correct. For a pyramid the build should pop bottom -> up; render.js
+       can't read the template's orientation, so the template reverses the
+       element list itself when the .pyramid modifier is present (see below). */
+    window.__thothAnim = {
+      duration: 5.2,
+      build: function (gsap) {
+        var M = window.__thothMotion, tl = gsap.timeline({ paused: true });
+        M.fadeUp(gsap, tl, '.canvas-header', 0.15, { y: -24, duration: 0.5 });
+        M.fadeUp(gsap, tl, '.funnel-headline', 0.45, { y: 28, duration: 0.55 });
+        M.layerReveal(gsap, tl, '.pill', 0.95, { scaleFrom: 0.5, duration: 0.4 });
+        M.fadeUp(gsap, tl, '.subtitle', 1.15, { y: 16, duration: 0.5 });
+
+        // Tier reveal — pop each band in along the funnel's flow. For a funnel
+        // that's top -> down (DOM order); for a pyramid, bottom -> up, so feed
+        // layerReveal the band list reversed. We pass an explicit element array
+        // (layerReveal accepts a NodeList/array) so the stagger direction tracks
+        // orientation without any inline animation math.
+        var tiers = Array.prototype.slice.call(document.querySelectorAll('.tier'));
+        if (document.body.classList.contains('pyramid')) tiers.reverse();
+        M.layerReveal(gsap, tl, tiers, 1.6, {
+          scaleFrom: 0.6, origin: '50% 50%', duration: 0.55, stagger: 0.55
+        });
+
+        M.fadeUp(gsap, tl, '.canvas-footer', 4.7, { duration: 0.5 });
+        return tl;
+      }
+    };
+  </script>
+</body>
+</html>

@@ -22,10 +22,12 @@
   --font-body:        var(--font-display);
   --font-mono:        "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
 
-  /* Sizing — built around a 1200x1200 square @1x. Render at 2x via Puppeteer. */
-  --canvas-size:      1200px;
+  /* Sizing — portrait 4:5 (1080x1350): LinkedIn's max feed real estate.
+     render.js sets a matching Puppeteer viewport + screenshot clip. */
+  --canvas-w:         1080px;
+  --canvas-h:         1350px;
   --canvas-padding:   96px;
-  --canvas-radius:    0px;          /* LinkedIn renders square; no radius needed */
+  --canvas-radius:    0px;          /* LinkedIn renders flush; no radius needed */
 
   /* Type scale — tuned for in-feed mobile reading */
   --size-display:     112px;        /* big number for stat cards */
@@ -56,4 +58,17 @@
   --space-6:          64px;
   --space-7:          96px;
   --space-8:          128px;
+
+  /* Component kit — overridable per persona via brand.yaml `palette:` / `style:` */
+  --swatch-1:         #EAEAF2;
+  --swatch-2:         #E4ECF7;
+  --swatch-3:         #E8F3EC;
+  --swatch-4:         #F3ECF7;
+  --swatch-5:         #F7EFE4;
+  --card-radius:      24px;
+  --card-stroke:      rgba(25, 26, 53, 0.88);
+  --card-stroke-w:    2px;
+  --card-shadow:      rgba(25, 26, 53, 0.14);
+  --pill-radius:      999px;
+  --bg-gradient:      var(--brand-bg);   /* persona may override with a gradient */
 }

@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<!--
+  Thoth single-image template: venn-card  (sticker re-skin)
+  Best for: an "overlap = the insight" post — where two, three, or four ideas
+  intersect and the punchline lives in the shared middle (cf. the source
+  infographic "Close the Strategy-Execution Gap", a 3-circle Venn).
+
+  Re-skinned to match the steps-card / layers-card "sticker" aesthetic: a
+  headline .lockup with a punchy word in a .pill, an optional .subtitle, and a
+  set of outlined, palette-swatch-filled circles that overlap so the blend in
+  the middle reads as the takeaway. Each circle is a sticker (kit outline +
+  drop-shadow + swatch fill) held at ~0.78 opacity so overlaps visibly mix. A
+  dashed .tag in the shared center carries the intersection punchline. All
+  colour is token-driven so a persona's brand.yaml restyles it together with
+  the other cards.
+
+  Content fields (from render.js):
+    eyebrow        optional   small uppercase caption above the headline
+    headline       required   the title lead-in (target 18–46 chars)
+    pill           optional   one punchy word/phrase punched into the lockup pill
+    subhead        optional   one muted line under the lockup
+    circle1_label  required   label for circle 1
+    circle1_desc   optional   one short line under circle 1's label
+    circle2_label  required   label for circle 2  (2 circles minimum)
+    circle2_desc   optional   matching description
+    circle3_label  optional   label for circle 3  (present -> 3-circle layout)
+    circle3_desc   optional   matching description
+    circle4_label  optional   label for circle 4  (present -> 4-circle cluster)
+    circle4_desc   optional   matching description
+    center_label   optional   the intersection takeaway, in the shared overlap
+    type_label     optional   footer genre label (e.g. "Framework")
+    attribution    optional   default: {{handle}}
+
+  Render only the circles whose label slot is filled. Each circle is a FIXED
+  numbered slot wrapped in a SINGLE {{#circleN_label}}...{{/circleN_label}}
+  conditional; circleN_desc inside it is a plain {{var}} substitution that
+  collapses via the .venn-text .desc:empty rule when absent. The number of
+  circles is NOT passed as a variable — geometry is driven purely off how many
+  .venn-circle elements exist, via .venn-stage:has(.c3/.c4) selectors (Chrome,
+  the renderer, supports :has()), so 2 / 3 / 4 circles each get their own
+  overlapping arrangement with no count flag. center_label collapses to nothing
+  when its slot is empty.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <style>{{tokens_css}}{{base_css}}
+    .venn-headline { max-width: 900px; margin-bottom: var(--space-2); }
+    .venn-sub { margin-bottom: var(--space-4); }
+
+    /* Relatively-positioned stage the absolute circles center inside. Fixed box
+       (820x720) sits well within the 888x1158 usable area; circles are pinned by
+       their top-left corner so the geometry below is exact and never clips. */
+    .venn-stage {
+      position: relative;
+      width: 820px;
+      height: 720px;
+      margin: var(--space-2) auto 0;
+      flex: 0 0 auto;
+    }
+
+    /* Each circle is a kit sticker: swatch fill + kit outline + drop-shadow,
+       forced round. The blending happens on a ::before FILL layer held at ~0.78
+       opacity (so where circles overlap the fills visibly mix — the whole point
+       of a Venn) while the circle element itself stays fully opaque, keeping the
+       outline + label crisp. Resting state = FINAL look; layerReveal only scales
+       the circle from its center, so the static PNG is correct with no JS. The
+       label/desc block sits inside, anchored per-circle to the OUTER edge so
+       text stays off the busy shared center. */
+    .venn-circle {
+      position: absolute;
+      border: var(--card-stroke-w) solid var(--card-stroke);
+      border-radius: 50%;
+      box-shadow: 0 7px 0 var(--card-shadow);
+      display: flex;
+    }
+    /* Semi-transparent fill layer — this is what blends in the overlaps. The
+       swatch comes from the kit palette (never hardcoded); --venn-fill is set
+       per-circle below. Inset so it sits inside the crisp outline. */
+    .venn-circle::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: var(--venn-fill, var(--swatch-1));
+      opacity: 0.78;                       /* overlaps mix; tune 0.7–0.8 */
+      z-index: 0;
+    }
+    /* Per-circle swatch fills (kit palette, never hardcoded). */
+    .venn-circle.c1 { --venn-fill: var(--swatch-1); }
+    .venn-circle.c2 { --venn-fill: var(--swatch-2); }
+    .venn-circle.c3 { --venn-fill: var(--swatch-3); }
+    .venn-circle.c4 { --venn-fill: var(--swatch-4); }
+
+    /* Label + desc that ride inside each circle, near its outer edge. The
+       wrapper is a band the per-circle alignment (set in the layout blocks)
+       pushes to the correct outer side so it never collides with the center
+       punchline. It sits at z-index 1, ABOVE this circle's semi-transparent
+       ::before fill, so the type stays fully opaque + crisp while only the
+       fill blends in the overlaps. */
+    .venn-text {
+      position: relative;
+      z-index: 1;                          /* ride above this circle's fill layer */
+      width: 100%;
+      padding: var(--space-3) var(--space-4);
+      text-align: center;
+      pointer-events: none;
+    }
+    .venn-text .label {
+      display: block;
+      font-family: var(--font-display);
+      font-weight: var(--weight-headline);
+      font-size: 38px;
+      line-height: var(--leading-tight);
+      letter-spacing: -0.02em;
+      color: var(--brand-ink);
+    }
+    .venn-text .desc {
+      display: block;
+      max-width: 240px;
+      margin: 6px auto 0;              /* narrow centered column — never run wide into the circle gaps */
+      font-family: var(--font-body);
+      font-size: var(--size-caption);
+      font-weight: var(--weight-body);
+      line-height: var(--leading-normal);
+      color: var(--brand-muted);
+    }
+    /* Bare {{circleN_desc}} renders empty when absent -> collapse the line. */
+    .venn-text .desc:empty { display: none; }
+
+    /* The intersection punchline: a dashed sticker tag pinned to the shared
+       center of the cluster (which is the stage center for every count). Sits
+       ABOVE the circles (z-index) and stays fully opaque so the takeaway reads
+       crisply over the blended fills. Emphasis via the brand accent. */
+    .venn-center {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 10;
+      max-width: 300px;
+      text-align: center;
+    }
+    .venn-center .tag {
+      background: var(--brand-accent);
+      color: var(--brand-bg);
+      border-style: solid;
+      border-color: var(--brand-accent);
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: var(--size-body);
+      letter-spacing: -0.01em;
+      padding: 0.18em 0.7em;
+      box-shadow: 0 6px 0 var(--card-shadow);
+      white-space: nowrap;
+    }
+
+    /* ---- Geometry, driven purely off circle COUNT via :has() ----
+       Stage is 820x720; every layout shares a center at (410,360) so the
+       .venn-center punchline lands in the overlap for 2 / 3 / 4 circles.
+       left/top below are the circle's TOP-LEFT corner = center - radius. */
+
+    /* DEFAULT = 2 circles (D=440, r=220): side by side, overlap ~180px. */
+    .venn-circle { width: 440px; height: 440px; }
+    .c1 { left: 60px;  top: 140px; }                   /* center (280,360) */
+    .c2 { left: 320px; top: 140px; }                   /* center (540,360) */
+    /* 2-circle labels ride the far outer side, vertically centered. */
+    .venn-stage:not(:has(.c3)) .venn-text { align-self: center; }
+    .venn-stage:not(:has(.c3)) .c1 { justify-content: flex-start; }
+    .venn-stage:not(:has(.c3)) .c1 .venn-text { width: 56%; }
+    .venn-stage:not(:has(.c3)) .c2 { justify-content: flex-end; }
+    .venn-stage:not(:has(.c3)) .c2 .venn-text { width: 56%; }
+
+    /* 3 circles (D=420, r=210): triangle, two up + one down-center. Labels in
+       the exposed crescents — top two ride their top edge, bottom one its
+       bottom edge — so they clear the central triple overlap. */
+    .venn-stage:has(.c3):not(:has(.c4)) .venn-circle { width: 420px; height: 420px; }
+    .venn-stage:has(.c3):not(:has(.c4)) .c1 { left: 80px;  top: 40px; }   /* center (290,250) */
+    .venn-stage:has(.c3):not(:has(.c4)) .c2 { left: 320px; top: 40px; }   /* center (530,250) */
+    .venn-stage:has(.c3):not(:has(.c4)) .c3 { left: 200px; top: 260px; }  /* center (410,470) */
+    .venn-stage:has(.c3):not(:has(.c4)) .venn-circle { align-items: flex-start; }
+    .venn-stage:has(.c3):not(:has(.c4)) .c1 .venn-text { transform: translateX(-14%); }
+    .venn-stage:has(.c3):not(:has(.c4)) .c2 .venn-text { transform: translateX(14%); }
+    .venn-stage:has(.c3):not(:has(.c4)) .c3 { align-items: flex-end; }
+
+    /* 4 circles (D=400, r=200): 2x2 cluster, adjacent + diagonal all overlap at
+       the shared center. Labels ride the OUTER corner of each circle. */
+    .venn-stage:has(.c4) .venn-circle { width: 400px; height: 400px; }
+    .venn-stage:has(.c4) .c1 { left: 110px; top: 60px;  }   /* center (310,260) TL */
+    .venn-stage:has(.c4) .c2 { left: 310px; top: 60px;  }   /* center (510,260) TR */
+    .venn-stage:has(.c4) .c3 { left: 110px; top: 260px; }   /* center (310,460) BL */
+    .venn-stage:has(.c4) .c4 { left: 310px; top: 260px; }   /* center (510,460) BR */
+    .venn-stage:has(.c4) .c1 { align-items: flex-start; justify-content: flex-start; }
+    .venn-stage:has(.c4) .c2 { align-items: flex-start; justify-content: flex-end; }
+    .venn-stage:has(.c4) .c3 { align-items: flex-end;   justify-content: flex-start; }
+    .venn-stage:has(.c4) .c4 { align-items: flex-end;   justify-content: flex-end; }
+    .venn-stage:has(.c4) .venn-text { width: 62%; }
+  </style>
+</head>
+<body>
+  <div class="canvas">
+    <header class="canvas-header">
+      {{#eyebrow}}<span class="text-caption">{{eyebrow}}</span>{{/eyebrow}}
+      <span class="accent-dot"></span>
+    </header>
+
+    <main style="flex: 1; display: flex; flex-direction: column; justify-content: center;">
+      <h1 class="text-headline-sm venn-headline lockup">
+        <span>{{headline}}</span>{{#pill}} <span class="pill">{{pill}}</span>{{/pill}}
+      </h1>
+      {{#subhead}}<p class="subtitle venn-sub">{{subhead}}</p>{{/subhead}}
+
+      <!-- Overlapping circles. DOM order 1..N; layerReveal staggers them in
+           from center. center_label sits last in the DOM and pops in after. -->
+      <div class="venn-stage">
+        {{#circle1_label}}<div class="venn-circle c1">
+          <div class="venn-text">
+            <span class="label">{{circle1_label}}</span>
+            <span class="desc">{{circle1_desc}}</span>
+          </div>
+        </div>{{/circle1_label}}
+        {{#circle2_label}}<div class="venn-circle c2">
+          <div class="venn-text">
+            <span class="label">{{circle2_label}}</span>
+            <span class="desc">{{circle2_desc}}</span>
+          </div>
+        </div>{{/circle2_label}}
+        {{#circle3_label}}<div class="venn-circle c3">
+          <div class="venn-text">
+            <span class="label">{{circle3_label}}</span>
+            <span class="desc">{{circle3_desc}}</span>
+          </div>
+        </div>{{/circle3_label}}
+        {{#circle4_label}}<div class="venn-circle c4">
+          <div class="venn-text">
+            <span class="label">{{circle4_label}}</span>
+            <span class="desc">{{circle4_desc}}</span>
+          </div>
+        </div>{{/circle4_label}}
+
+        {{#center_label}}<div class="venn-center">
+          <span class="tag">{{center_label}}</span>
+        </div>{{/center_label}}
+      </div>
+    </main>
+
+    <footer class="canvas-footer">
+      <span class="handle">{{attribution}}</span>
+      <span>{{type_label}}</span>
+    </footer>
+  </div>
+
+  <script>
+    /* Animation spec — composes shared primitives from window.__thothMotion,
+       which render.js injects in GIF mode. Static PNG mode never calls build(),
+       so the card renders in its final resting state from CSS. */
+    window.__thothAnim = {
+      duration: 5.2,
+      build: function (gsap) {
+        var M = window.__thothMotion, tl = gsap.timeline({ paused: true });
+        // Title block rises in, then the metric pill pops, then the subhead.
+        M.fadeUp(gsap, tl, '.canvas-header', 0.15, { y: -24, duration: 0.5 });
+        M.fadeUp(gsap, tl, '.venn-headline', 0.45, { y: 28, duration: 0.55 });
+        M.layerReveal(gsap, tl, '.pill', 0.95, { scaleFrom: 0.5, duration: 0.4 });
+        M.fadeUp(gsap, tl, '.venn-sub', 1.15, { y: 16, duration: 0.5 });
+        // Circles scale up from their own centers, staggered 1..N.
+        M.layerReveal(gsap, tl, '.venn-circle', 1.6, {
+          scaleFrom: 0.45, origin: '50% 50%', duration: 0.6, stagger: 0.45
+        });
+        // The insight punches in last, after the circles have settled.
+        M.fadeUp(gsap, tl, '.venn-center', 3.6, { y: 18, duration: 0.55 });
+        M.layerReveal(gsap, tl, '.venn-center .tag', 3.7, { scaleFrom: 0.5, duration: 0.45 });
+        // Footer last.
+        M.fadeUp(gsap, tl, '.canvas-footer', 4.5, { duration: 0.5 });
+        return tl;
+      }
+    };
+  </script>
+</body>
+</html>

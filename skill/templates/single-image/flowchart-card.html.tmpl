@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<!--
+  Thoth single-image template: flowchart-card
+  Best for: a process / flow post — a vertical sequence of named steps that
+            connect top -> bottom with arrows, reading as a flowchart.
+            (cf. catalog "Process Chart", the "Expertise -> Viral Content" flow.)
+
+  Content fields (from render.js):
+    eyebrow        optional   small uppercase caption above the headline
+    headline       required   the title (e.g. "How a churned user comes back")
+    pill           optional   one word/phrase punched into the lockup's display pill
+    subhead        optional   one muted line under the lockup
+    node1_label    required   FIRST node label (top of the flow)
+    node1_desc     optional   one short line under node 1's label
+    node2_label..node5_label  optional   later node labels, top -> bottom
+    node2_desc..node5_desc    optional   matching one-line descriptions
+    node1_key..node5_key      optional   truthy marks THAT node as the accent
+                              "key" node (accent fill + bg-colour text). The
+                              mustache engine can't compare strings, so the
+                              accent switch is an explicit boolean per slot, the
+                              same pattern bar-chart-card (barN_accent) and
+                              funnel-card (is_pyramid) use.
+    type_label     optional   footer genre label (e.g. "Process")
+    attribution    optional   default: handle
+
+  Renders 3-5 nodes. Each node is a FIXED numbered slot wrapped in a single
+  nodeN_label section conditional, so unused slots vanish and one .node
+  selector animates them all in DOM order (top -> bottom). nodeN_desc stays a
+  bare variable that collapses via the .node-desc:empty rule when absent.
+  (Field names are written WITHOUT braces in this comment on purpose: render.js
+  processes mustache tokens everywhere, comments included, so a stray token here
+  would be stripped or mangle the output.)
+
+  Between consecutive nodes sits a downward connector arrow: a small inline
+  <svg> holding ONE <path class="conn"> that draws the shaft AND the arrowhead as
+  a single open stroke (NO svg marker element — a marker would not participate in
+  the stroke-dashoffset draw, so the head would pop in fully formed). Each
+  connector cN lives INSIDE its DOWNSTREAM node's section block, so a connector
+  only renders when the node below it also renders. One .conn selector lets
+  M.drawOn animate every arrow, interleaved with the node reveals.
+
+  Re-skin: each node is a kit "sticker" .card. Default nodes carry a palette
+  SWATCH fill (.fill-1..5); a node flagged key takes .key (accent fill, bg-colour
+  ink) to call out the pivotal step. A square .badge numbers each node top->down
+  (1 = top). Connector stroke is var(--brand-ink). Matches steps-card /
+  funnel-card lockup, persona font, gradient bg, footer, and density - all
+  token-driven so a persona's brand.yaml restyles the whole family at once.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <style>{{tokens_css}}{{base_css}}
+    .flow-headline { max-width: 880px; margin-top: var(--space-3); margin-bottom: var(--space-2); }
+    .flow-headline .pill { font-size: 0.92em; }
+    .subtitle { margin-bottom: var(--space-3); }
+
+    /* The flow: a centered vertical column of node stickers separated by short
+       downward connector arrows. Centered so the spine and arrowheads line up
+       under the column's midline. flex:1 + min-height:0 lets it own the leftover
+       height between the lockup and the footer. */
+    .flow-stack {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* One node box. Inherits the kit sticker look from .card; the per-node
+       .fill-N class supplies a palette swatch (or .key swaps in the accent).
+       Content is CENTERED so the label/desc sit on the column's spine. Padding
+       is tightened from the kit default so five nodes + four connectors fit the
+       usable height. A fixed width keeps every box the same size down the spine. */
+    .node {
+      width: 70%;
+      padding: var(--space-2) var(--space-4);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      overflow: hidden;
+    }
+    /* Badge + label ride one centered line so each box reads as a numbered chip;
+       the desc tucks under it. */
+    .node-head {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-2);
+      min-width: 0;
+      max-width: 100%;
+    }
+    /* Smaller than the kit default so it fits the shorter boxes; still the
+       ink/bg sticker glyph used across the family. */
+    .node .badge {
+      width: 48px; height: 48px;
+      border-radius: 14px;
+      font-size: 26px;
+    }
+    .node-label {
+      font-family: var(--font-display);
+      font-weight: var(--weight-headline);
+      font-size: 38px;
+      line-height: 1.0;
+      letter-spacing: -0.02em;
+      color: var(--brand-ink);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
+    }
+    .node-desc {
+      font-family: var(--font-body);
+      font-size: var(--size-caption);
+      font-weight: var(--weight-body);
+      line-height: var(--leading-normal);
+      color: var(--brand-muted);
+      margin-top: 6px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
+    }
+    /* Bare nodeN_desc renders empty when absent -> collapse the line. */
+    .node-desc:empty { display: none; }
+
+    /* The accent "key" node: swap the swatch fill for the brand accent and flip
+       label/desc/badge to the bg colour so the pivotal step pops. Overrides the
+       .fill-N swatch because .key comes after it on the element. */
+    .node.key {
+      --card-fill: var(--brand-accent);
+    }
+    .node.key .node-label { color: var(--brand-bg); }
+    .node.key .node-desc { color: var(--brand-bg); opacity: 0.85; }
+    .node.key .badge {
+      background: var(--brand-bg);
+      color: var(--brand-accent);
+    }
+
+    /* Downward connector arrow between two nodes. The <svg> is a fixed short
+       box on the column's midline; its single .conn path draws a vertical shaft
+       that forks into a chevron arrowhead at the bottom, all one open stroke so
+       M.drawOn animates the whole arrow (shaft + head) as it draws. Resting
+       state = fully drawn (no dasharray set in CSS); drawOn sets the dash at
+       runtime, so the static PNG shows complete arrows with no JS. */
+    .conn-wrap {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 44px;
+      flex: 0 0 auto;
+    }
+    .conn {
+      stroke: var(--brand-ink);
+      stroke-width: 4;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+  </style>
+</head>
+<body>
+  <div class="canvas">
+    <header class="canvas-header">
+      {{#eyebrow}}<span class="text-caption">{{eyebrow}}</span>{{/eyebrow}}
+      <span class="accent-dot"></span>
+    </header>
+
+    <h1 class="text-headline-sm flow-headline lockup">
+      <span>{{headline}}</span>{{#pill}} <span class="pill">{{pill}}</span>{{/pill}}
+    </h1>
+    {{#subhead}}<p class="subtitle">{{subhead}}</p>{{/subhead}}
+
+    <!-- Nodes in DOM order TOP -> BOTTOM. node1 = top, highest-numbered = bottom.
+         Each node carries its swatch fill (.fill-N); a node flagged key takes
+         the .key accent. The badge number is fixed per slot so it reads top->down.
+         Each connector cN sits at the TOP of node N's block (N >= 2), so it only
+         renders when the node above AND this node both exist -> no dangling arrow
+         after the last node. The connector svg viewBox is 40x44: a vertical shaft
+         from (20,2) to (20,34), then a chevron to (12,26) and (28,26) -> one open
+         stroke that draws shaft-then-head under M.drawOn. -->
+    <div class="flow-stack">
+      {{#node1_label}}<div class="node card fill-1{{#node1_key}} key{{/node1_key}}">
+        <div class="node-head">
+          <span class="badge">1</span>
+          <span class="node-label">{{node1_label}}</span>
+        </div>
+        <span class="node-desc">{{node1_desc}}</span>
+      </div>{{/node1_label}}
+
+      {{#node2_label}}<div class="conn-wrap">
+        <svg viewBox="0 0 40 44" width="40" height="44" aria-hidden="true">
+          <path class="conn" d="M20 2 L20 34 M12 26 L20 34 L28 26"></path>
+        </svg>
+      </div>
+      <div class="node card fill-2{{#node2_key}} key{{/node2_key}}">
+        <div class="node-head">
+          <span class="badge">2</span>
+          <span class="node-label">{{node2_label}}</span>
+        </div>
+        <span class="node-desc">{{node2_desc}}</span>
+      </div>{{/node2_label}}
+
+      {{#node3_label}}<div class="conn-wrap">
+        <svg viewBox="0 0 40 44" width="40" height="44" aria-hidden="true">
+          <path class="conn" d="M20 2 L20 34 M12 26 L20 34 L28 26"></path>
+        </svg>
+      </div>
+      <div class="node card fill-3{{#node3_key}} key{{/node3_key}}">
+        <div class="node-head">
+          <span class="badge">3</span>
+          <span class="node-label">{{node3_label}}</span>
+        </div>
+        <span class="node-desc">{{node3_desc}}</span>
+      </div>{{/node3_label}}
+
+      {{#node4_label}}<div class="conn-wrap">
+        <svg viewBox="0 0 40 44" width="40" height="44" aria-hidden="true">
+          <path class="conn" d="M20 2 L20 34 M12 26 L20 34 L28 26"></path>
+        </svg>
+      </div>
+      <div class="node card fill-4{{#node4_key}} key{{/node4_key}}">
+        <div class="node-head">
+          <span class="badge">4</span>
+          <span class="node-label">{{node4_label}}</span>
+        </div>
+        <span class="node-desc">{{node4_desc}}</span>
+      </div>{{/node4_label}}
+
+      {{#node5_label}}<div class="conn-wrap">
+        <svg viewBox="0 0 40 44" width="40" height="44" aria-hidden="true">
+          <path class="conn" d="M20 2 L20 34 M12 26 L20 34 L28 26"></path>
+        </svg>
+      </div>
+      <div class="node card fill-5{{#node5_key}} key{{/node5_key}}">
+        <div class="node-head">
+          <span class="badge">5</span>
+          <span class="node-label">{{node5_label}}</span>
+        </div>
+        <span class="node-desc">{{node5_desc}}</span>
+      </div>{{/node5_label}}
+    </div>
+
+    <footer class="canvas-footer">
+      <span class="handle">{{attribution}}</span>
+      <span>{{type_label}}</span>
+    </footer>
+  </div>
+
+  <script>
+    /* Animation spec - composes shared primitives from window.__thothMotion,
+       which render.js injects in GIF mode. Static PNG mode never calls build(),
+       so the card renders in its final resting state from CSS.
+
+       The flow reveals top -> bottom, interleaving node + connector: each node
+       fades up, then the arrow leaving it draws, then the next node. Because the
+       reveal primitives need to fire per-node (node, draw its arrow, next node)
+       rather than as one big stagger, we walk the .node / .conn elements in DOM
+       order and place each on the timeline at a marching offset. fadeUp reveals
+       a node; drawOn draws the connector immediately after (the i-th connector
+       sits AFTER the i-th node and BEFORE the (i+1)-th). This keeps one primitive
+       per element group (no overlapping opacity tweens) while still cascading. */
+    window.__thothAnim = {
+      duration: 5.3,
+      build: function (gsap) {
+        var M = window.__thothMotion, tl = gsap.timeline({ paused: true });
+        M.fadeUp(gsap, tl, '.canvas-header', 0.15, { y: -24, duration: 0.5 });
+        M.fadeUp(gsap, tl, '.flow-headline', 0.45, { y: 28, duration: 0.55 });
+        M.layerReveal(gsap, tl, '.pill', 0.95, { scaleFrom: 0.5, duration: 0.4 });
+        M.fadeUp(gsap, tl, '.subtitle', 1.15, { y: 16, duration: 0.5 });
+
+        // Walk nodes + connectors in DOM order, marching down the flow. Node i
+        // fades up at `at`; connector i (the arrow leaving node i) draws right
+        // after, then `at` advances for the next node. Connectors are matched to
+        // the node ABOVE them by DOM order (a connector always follows its
+        // upstream node), so conns[i] is the arrow out of nodes[i].
+        var nodes = Array.prototype.slice.call(document.querySelectorAll('.node'));
+        var conns = Array.prototype.slice.call(document.querySelectorAll('.conn'));
+        var at = 1.55, step = 0.62;
+        nodes.forEach(function (node, i) {
+          M.fadeUp(gsap, tl, node, at, { y: 22, duration: 0.45 });
+          if (conns[i]) M.drawOn(gsap, tl, conns[i], at + 0.32, { duration: 0.3 });
+          at += step;
+        });
+
+        M.fadeUp(gsap, tl, '.canvas-footer', 4.9, { duration: 0.5 });
+        return tl;
+      }
+    };
+  </script>
+</body>
+</html>
