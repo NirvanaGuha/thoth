@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<!--
+  Thoth single-image template: steps-card
+  Best for: a numbered how-to / list post (LinkedIn "educational" genre).
+  Content fields (from render.js):
+    eyebrow        optional   small uppercase caption above the headline
+    headline       required   the title (target 30–70 chars)
+    step1_title    required   first step title
+    step1_desc     optional   first step description (one short line)
+    step2_title..step5_title  optional additional step titles (fixed slots)
+    step2_desc..step5_desc    optional matching descriptions
+    type_label     optional   footer genre label (e.g. "Educational")
+    attribution    optional   default: {{handle}}
+
+  Renders up to 5 numbered step rows. Each row is a fixed slot wrapped in a
+  {{#stepN_title}} conditional, so missing steps render nothing. Every row
+  shares the .step class so one selector animates them in DOM order.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <style>{{tokens_css}}{{base_css}}
+    .steps-headline { max-width: 940px; margin-bottom: var(--space-2); }
+    .subtitle { margin-bottom: var(--space-5); }
+    .steps-list { display: flex; flex-direction: column; gap: var(--space-3); }
+    .step { display: flex; align-items: flex-start; gap: var(--space-3); padding: var(--space-3) var(--space-4); }
+    .step-body { flex: 1 1 auto; padding-top: 4px; }
+    .step-title {
+      font-family: var(--font-display);
+      font-size: 40px;
+      font-weight: var(--weight-headline);
+      line-height: var(--leading-tight);
+      letter-spacing: -0.02em;
+    }
+    .step-desc {
+      margin-top: 6px;
+      color: var(--brand-muted);
+      font-size: 28px;
+      line-height: var(--leading-normal);
+    }
+    /* render.js's mustache-lite cannot nest conditionals, so the optional
+       description is a bare variable; hide its box entirely when empty. */
+    .step-desc:empty { display: none; }
+  </style>
+</head>
+<body>
+  <div class="canvas">
+    <header class="canvas-header">
+      {{#eyebrow}}<span class="text-caption">{{eyebrow}}</span>{{/eyebrow}}
+      <span class="accent-dot"></span>
+    </header>
+
+    <main style="flex: 1; display: flex; flex-direction: column; justify-content: center;">
+      <h1 class="text-headline steps-headline lockup">
+        <span>{{headline}}</span>{{#pill}} <span class="pill">{{pill}}</span>{{/pill}}
+      </h1>
+      {{#subhead}}<p class="subtitle">{{subhead}}</p>{{/subhead}}
+
+      <div class="steps-list">
+        {{#step1_title}}<div class="step card fill-1">
+          <span class="badge">1</span>
+          <div class="step-body">
+            <p class="step-title">{{step1_title}}</p>
+            <p class="step-desc">{{step1_desc}}</p>
+          </div>
+        </div>{{/step1_title}}
+        {{#step2_title}}<div class="step card fill-2">
+          <span class="badge">2</span>
+          <div class="step-body">
+            <p class="step-title">{{step2_title}}</p>
+            <p class="step-desc">{{step2_desc}}</p>
+          </div>
+        </div>{{/step2_title}}
+        {{#step3_title}}<div class="step card fill-3">
+          <span class="badge">3</span>
+          <div class="step-body">
+            <p class="step-title">{{step3_title}}</p>
+            <p class="step-desc">{{step3_desc}}</p>
+          </div>
+        </div>{{/step3_title}}
+        {{#step4_title}}<div class="step card fill-4">
+          <span class="badge">4</span>
+          <div class="step-body">
+            <p class="step-title">{{step4_title}}</p>
+            <p class="step-desc">{{step4_desc}}</p>
+          </div>
+        </div>{{/step4_title}}
+        {{#step5_title}}<div class="step card fill-5">
+          <span class="badge">5</span>
+          <div class="step-body">
+            <p class="step-title">{{step5_title}}</p>
+            <p class="step-desc">{{step5_desc}}</p>
+          </div>
+        </div>{{/step5_title}}
+      </div>
+    </main>
+
+    <footer class="canvas-footer">
+      <span class="handle">{{attribution}}</span>
+      <span>{{type_label}}</span>
+    </footer>
+  </div>
+
+  <script>
+    /* Animation spec — composes shared primitives from window.__thothMotion,
+       which render.js injects in GIF mode. Static PNG mode never calls build(),
+       so the card renders in its final resting state from CSS. */
+    window.__thothAnim = {
+      duration: 5.5,
+      build: function (gsap) {
+        var M = window.__thothMotion, tl = gsap.timeline({ paused: true });
+        M.fadeUp(gsap, tl, '.canvas-header', 0.15, { y: -24, duration: 0.5 });
+        M.fadeUp(gsap, tl, '.steps-headline', 0.5, { y: 28, duration: 0.55 });
+        M.layerReveal(gsap, tl, '.pill', 0.95, { scaleFrom: 0.5, duration: 0.4 });
+        M.fadeUp(gsap, tl, '.subtitle', 1.15, { y: 16, duration: 0.5 });
+        M.colorWave(gsap, tl, '.step', 1.55, { stagger: 0.5, duration: 0.55, from: 0 });
+        M.fadeUp(gsap, tl, '.canvas-footer', 4.7, { duration: 0.5 });
+        return tl;
+      }
+    };
+  </script>
+</body>
+</html>

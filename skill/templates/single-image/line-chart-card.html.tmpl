@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<!--
+  Thoth single-image template: line-chart-card  (sticker re-skin)
+  Best for: a "growth / trend" post — a rising line+area curve over time plus one
+  headline result number. The story is the SHAPE of the climb (a metric bending
+  up and to the right) anchored by a big count-up stat. (cf. catalog "GROW Your
+  Followers & Revenue" — a rising curve + a headline stat + before/after callouts.)
+
+  Re-skinned to the steps-card / bar-chart-card "sticker" aesthetic: a headline
+  .lockup with the punchy metric in a .pill, a .subtitle, and the whole chart
+  living inside an outlined, shadowed, swatch-filled sticker .card. The card head
+  carries a glyph .badge, an optional dashed .tag, and the count-up stat on the
+  right (identical band to bar-chart-card). All colour is token-driven so a
+  persona's brand.yaml restyles it together with the rest of the family.
+
+  Content fields (from render.js):
+    eyebrow        optional   small uppercase caption above the headline
+    headline       required   the claim / framing lead-in (target 18–46 chars)
+    pill           optional   the punchy word/metric punched into the lockup pill
+                              (e.g. "TRIGGERED PUSH", "+312%") — keep it short
+    subhead        optional   one muted line under the lockup
+    stat           optional   big result number, animated with countUp (e.g. "+312%", "3.2x")
+    stat_caption   optional   tiny label beside the stat (e.g. "reactivation in 12 months")
+    card_label     optional   dashed tag on the card header (e.g. "REACTIVATION")
+    points         required   the curve as a comma-separated list of y-values,
+                              0–100, left -> right (e.g. "8,14,20,33,52,88,100").
+                              0 = baseline (bottom of plot), 100 = top. build()
+                              parses this and CONSTRUCTS the path; 2–12 points.
+    x_start_label  optional   left axis-end label (e.g. "Jan")
+    x_end_label    optional   right axis-end label (e.g. "Dec")
+    baseline_label optional   callout pinned at the START of the curve (low point)
+    peak_label     optional   callout pinned at the END of the curve (the peak)
+    before_label   optional   annotation under the axis (e.g. "Before: weekly blasts")
+    after_label    optional   annotation under the axis (e.g. "After: triggered flows")
+    type_label     optional   footer genre label (e.g. "Result")
+    attribution    optional   default: handle
+
+  THE CURVE: an inline <svg class="line-plot"> carries the y-values in a
+  data-points attribute. Two paths share the SAME top edge: .area (filled swatch,
+  NO stroke) closes down to the baseline and fades up under the line; .curve
+  (accent stroke, NO fill) is the line itself, drawn left -> right by M.drawOn
+  (stroke-dashoffset). The viewBox is a fixed 800x420 user-space stretched to the
+  card width via preserveAspectRatio="none" (the timeline-spine trick); the stroke
+  stays a uniform weight via vector-effect:non-scaling-stroke, so the climb scales
+  to fill the card without distorting the line thickness.
+
+  build() parses data-points, maps each value across the plot (x evenly spread,
+  y inverted so 100 sits at the top), and writes a smooth Catmull-Rom path onto
+  BOTH .curve (open top edge) and .area (top edge + down to baseline + close),
+  then runs M.drawOn on .curve so it draws itself. An accent .peak-dot is parked
+  at the last point. This makes the chart fully data-driven from `points`.
+
+  Resting state = FINAL look: the template ships a hardcoded default `d` on both
+  paths AND an inline default position on the peak dot (computed for the example
+  points), so the static PNG renders a complete, correct curve with NO JS. build()
+  (GIF mode only) recomputes everything from data-points and overwrites it, so a
+  custom `points` list animates accurately while the still stays valid.
+  (Field names are written WITHOUT braces in this comment on purpose: render.js
+  processes mustache tokens everywhere, comments included, so a stray token here
+  would be stripped or mangle the output.)
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <style>{{tokens_css}}{{base_css}}
+    /* Title lockup — headline lead-in + the punchy metric in a display pill,
+       exactly like steps-card / bar-chart-card. */
+    .line-headline { max-width: 940px; margin-bottom: var(--space-2); }
+    .line-sub { margin-bottom: var(--space-5); }
+
+    /* The result lives inside ONE big sticker card (swatch fill, outline,
+       drop-shadow) — the line-chart sibling of a bar-chart-card. */
+    .line-card { padding: var(--space-5) var(--space-5) var(--space-4); }
+
+    /* Card header band: a glyph badge + a dashed category tag + the count-up
+       stat on the right, so the card reads dense like bar-chart-card. */
+    .line-head {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      margin-bottom: var(--space-4);
+    }
+    .line-head .badge { width: 60px; height: 60px; font-size: 30px; border-radius: 16px; }
+    .line-stat-wrap { margin-left: auto; text-align: right; line-height: 1; }
+    .line-stat {
+      font-family: var(--font-display);
+      font-size: var(--size-display);
+      font-weight: var(--weight-display);
+      letter-spacing: -0.03em;
+      color: var(--brand-accent);
+      line-height: 0.9;
+    }
+    .line-stat-caption {
+      display: block;
+      margin-top: var(--space-1);
+      font-size: var(--size-caption);
+      font-weight: var(--weight-caption);
+      color: var(--brand-muted);
+      letter-spacing: 0.02em;
+      max-width: 320px;
+      margin-left: auto;
+    }
+    .line-stat-caption:empty { display: none; }
+
+    /* Plot frame: a fixed-height box the SVG fills edge to edge. The baseline
+       rule under it echoes the bar-chart plot's bottom axis. position:relative
+       anchors the callout chips parked over the curve ends. */
+    .line-plot-wrap {
+      position: relative;
+      height: 430px;
+      border-bottom: 3px solid var(--card-stroke);
+    }
+    /* The SVG stretches to fill the wrap; the 0..800 x 0..420 viewBox is mapped
+       to real pixels by preserveAspectRatio="none". overflow visible so the peak
+       dot's ring is never clipped at the right edge. */
+    .line-plot {
+      display: block;
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+    }
+    /* Filled area under the line — a palette swatch wash, NO stroke. Sits behind
+       the curve. Slight opacity so the card fill reads through it. */
+    .line-plot .area {
+      fill: var(--brand-accent);
+      fill-opacity: 0.16;
+      stroke: none;
+    }
+    /* The line itself — accent stroke, NO fill, uniform weight regardless of the
+       non-uniform viewBox stretch (non-scaling-stroke). drawOn animates its
+       stroke-dashoffset left -> right; resting state ships fully drawn. */
+    .line-plot .curve {
+      fill: none;
+      stroke: var(--brand-accent);
+      stroke-width: 7;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      vector-effect: non-scaling-stroke;
+    }
+    /* Accent end-dot parked at the curve's peak (last point). cx/cy ship inline
+       for the static still; build() repositions it to the real last point. The
+       bg ring + ink halo match the timeline node dots. */
+    .line-plot .peak-dot {
+      fill: var(--brand-accent);
+      stroke: var(--brand-bg);
+      stroke-width: 6;
+      paint-order: stroke;
+    }
+    .line-plot .peak-halo {
+      fill: none;
+      stroke: var(--brand-ink);
+      stroke-width: 3;
+      opacity: 0.9;
+    }
+
+    /* Callout chips pinned over the curve ends (baseline low @ left, peak @ right).
+       Dashed sticker tags so they read as part of the kit; absolute over the plot.
+       Bare tokens collapse the chip when absent via :empty. */
+    .line-callout {
+      position: absolute;
+      max-width: 300px;
+      background: var(--brand-bg);
+      color: var(--brand-ink);
+      letter-spacing: 0.02em;
+      white-space: nowrap;
+    }
+    .line-callout:empty { display: none; }
+    .callout-base { left: 0; bottom: 10px; }
+    /* The peak chip flips to a solid ink chip so the "after" result pops, like
+       the bar-chart winner tag. */
+    .callout-peak {
+      right: 0; top: 0;
+      background: var(--brand-ink);
+      color: var(--brand-bg);
+      border-style: solid;
+    }
+
+    /* X axis ends: start label left, end label right, under the baseline rule. */
+    .line-axis {
+      display: flex;
+      justify-content: space-between;
+      margin-top: var(--space-3);
+      font-family: var(--font-body);
+      font-size: var(--size-caption);
+      font-weight: var(--weight-caption);
+      color: var(--brand-muted);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    /* Optional before/after annotations under the axis — two dashed tags. The
+       row collapses to nothing when neither is supplied (each tag :empty-hides,
+       and the wrapper only renders if at least one section is present). */
+    .line-annot {
+      display: flex;
+      justify-content: space-between;
+      gap: var(--space-3);
+      margin-top: var(--space-4);
+    }
+    .line-annot .tag {
+      max-width: 48%;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .annot-after {
+      background: var(--brand-ink);
+      color: var(--brand-bg);
+      border-style: solid;
+    }
+  </style>
+</head>
+<body>
+  <div class="canvas">
+    <header class="canvas-header">
+      {{#eyebrow}}<span class="text-caption">{{eyebrow}}</span>{{/eyebrow}}
+      <span class="accent-dot"></span>
+    </header>
+
+    <main style="flex: 1; display: flex; flex-direction: column; justify-content: center;">
+      <h1 class="text-headline-sm line-headline lockup">
+        <span>{{headline}}</span>{{#pill}} <span class="pill">{{pill}}</span>{{/pill}}
+      </h1>
+      {{#subhead}}<p class="subtitle line-sub">{{subhead}}</p>{{/subhead}}
+
+      <div class="card fill-1 line-card">
+        <div class="line-head">
+          <span class="badge">&#9650;</span>
+          {{#card_label}}<span class="tag">{{card_label}}</span>{{/card_label}}
+          {{#stat}}<span class="line-stat-wrap">
+            <span class="text-display line-stat">{{stat}}</span>
+            <span class="line-stat-caption">{{stat_caption}}</span>
+          </span>{{/stat}}
+        </div>
+
+        <!-- The plot. data-points carries the y-values (0..100, left->right);
+             build() parses it and rewrites the area + curve d strings. The
+             hardcoded d below is the resting default for the static PNG: a smooth
+             rising curve matching the example points 8,18,30,26,46,70,100 across
+             the 800x420 viewBox (computed with build()'s exact formula so the
+             still equals the final animated frame), with the area closed down to
+             the baseline at y=420. The peak dot ships parked at the last point. -->
+        <div class="line-plot-wrap">
+          <svg class="line-plot" viewBox="0 0 800 420" preserveAspectRatio="none" aria-hidden="true" data-points="{{points}}">
+            <path class="area" d="M10.00 374.16 C 31.67 367.53, 96.67 348.95, 140.00 334.36 C 183.33 319.77, 226.67 291.91, 270.00 286.60 C 313.33 281.29, 356.67 313.13, 400.00 302.52 C 443.33 291.91, 486.67 252.11, 530.00 222.92 C 573.33 193.73, 616.67 163.22, 660.00 127.40 C 703.33 91.58, 768.33 27.90, 790.00 8.00 L 790.00 420 L 10.00 420 Z"></path>
+            <path class="curve" d="M10.00 374.16 C 31.67 367.53, 96.67 348.95, 140.00 334.36 C 183.33 319.77, 226.67 291.91, 270.00 286.60 C 313.33 281.29, 356.67 313.13, 400.00 302.52 C 443.33 291.91, 486.67 252.11, 530.00 222.92 C 573.33 193.73, 616.67 163.22, 660.00 127.40 C 703.33 91.58, 768.33 27.90, 790.00 8.00"></path>
+            <circle class="peak-halo" cx="790.00" cy="8.00" r="18"></circle>
+            <circle class="peak-dot" cx="790.00" cy="8.00" r="11"></circle>
+          </svg>
+          {{#baseline_label}}<span class="tag line-callout callout-base">{{baseline_label}}</span>{{/baseline_label}}
+          {{#peak_label}}<span class="tag line-callout callout-peak">{{peak_label}}</span>{{/peak_label}}
+        </div>
+
+        <div class="line-axis">
+          <span>{{x_start_label}}</span>
+          <span>{{x_end_label}}</span>
+        </div>
+
+        {{#before_label}}<div class="line-annot">
+          <span class="tag">{{before_label}}</span>
+          <span class="tag annot-after">{{after_label}}</span>
+        </div>{{/before_label}}
+      </div>
+    </main>
+
+    <footer class="canvas-footer">
+      <span class="handle">{{attribution}}</span>
+      <span>{{type_label}}</span>
+    </footer>
+  </div>
+
+  <script>
+    /* Animation spec — composes shared primitives from window.__thothMotion,
+       which render.js injects in GIF mode. Static PNG mode never calls build(),
+       so the card renders in its final resting state from CSS + the hardcoded
+       path d + inline peak-dot position.
+
+       Signature primitives: countUp (the headline result) + drawOn (the .curve
+       draws itself left -> right) with the .area fading up under it. build() also
+       CONSTRUCTS the path from the data-points attribute so the chart is
+       data-driven, then sets the stroke dash via drawOn. */
+    window.__thothAnim = {
+      duration: 5.4,
+      build: function (gsap) {
+        var M = window.__thothMotion, tl = gsap.timeline({ paused: true });
+
+        // ----- Data-driven path construction from data-points -----
+        // Map y-values (0..100, baseline->peak) across the fixed 800x420 viewBox,
+        // build a smooth Catmull-Rom -> cubic Bezier path for the line, and a
+        // closed area path (line + down to baseline). Writes BOTH paths + parks
+        // the peak dot at the last point. Runs before drawOn so getTotalLength()
+        // measures the real curve.
+        var svg = document.querySelector('.line-plot');
+        var curve = document.querySelector('.line-plot .curve');
+        var area = document.querySelector('.line-plot .area');
+        var dot = document.querySelector('.line-plot .peak-dot');
+        var halo = document.querySelector('.line-plot .peak-halo');
+        if (svg && curve && area) {
+          var raw = (svg.getAttribute('data-points') || '').split(',');
+          var ys = [];
+          for (var i = 0; i < raw.length; i++) {
+            var n = parseFloat(raw[i]);
+            if (!isNaN(n)) ys.push(Math.max(0, Math.min(100, n)));
+          }
+          if (ys.length >= 2) {
+            var W = 800, H = 420, padX = 10, padTop = 8, baseY = H - 14;
+            var plotH = baseY - padTop;
+            var n2 = ys.length;
+            var pts = ys.map(function (v, idx) {
+              var x = padX + (W - 2 * padX) * (idx / (n2 - 1));
+              var y = baseY - (v / 100) * plotH;
+              return { x: x, y: y };
+            });
+            // Catmull-Rom -> cubic Bezier (smooth curve through all points).
+            var d = 'M' + pts[0].x.toFixed(2) + ' ' + pts[0].y.toFixed(2);
+            for (var j = 0; j < n2 - 1; j++) {
+              var p0 = pts[j > 0 ? j - 1 : 0];
+              var p1 = pts[j];
+              var p2 = pts[j + 1];
+              var p3 = pts[j + 2 < n2 ? j + 2 : n2 - 1];
+              var c1x = p1.x + (p2.x - p0.x) / 6;
+              var c1y = p1.y + (p2.y - p0.y) / 6;
+              var c2x = p2.x - (p3.x - p1.x) / 6;
+              var c2y = p2.y - (p3.y - p1.y) / 6;
+              d += ' C ' + c1x.toFixed(2) + ' ' + c1y.toFixed(2) + ', ' +
+                   c2x.toFixed(2) + ' ' + c2y.toFixed(2) + ', ' +
+                   p2.x.toFixed(2) + ' ' + p2.y.toFixed(2);
+            }
+            curve.setAttribute('d', d);
+            area.setAttribute('d', d + ' L ' + pts[n2 - 1].x.toFixed(2) + ' ' + H +
+              ' L ' + pts[0].x.toFixed(2) + ' ' + H + ' Z');
+            var last = pts[n2 - 1];
+            if (dot) { dot.setAttribute('cx', last.x.toFixed(2)); dot.setAttribute('cy', last.y.toFixed(2)); }
+            if (halo) { halo.setAttribute('cx', last.x.toFixed(2)); halo.setAttribute('cy', last.y.toFixed(2)); }
+          }
+        }
+
+        // ----- Reveal timeline -----
+        // Title block rises in, then the metric pill pops.
+        M.fadeUp(gsap, tl, '.canvas-header', 0.15, { y: -24, duration: 0.5 });
+        M.fadeUp(gsap, tl, '.line-headline', 0.4, { y: 28, duration: 0.55 });
+        M.layerReveal(gsap, tl, '.pill', 0.85, { scaleFrom: 0.5, duration: 0.4 });
+        M.fadeUp(gsap, tl, '.line-sub', 1.05, { y: 16, duration: 0.5 });
+        // Sticker card + its header badge/tag settle in.
+        M.fadeUp(gsap, tl, '.line-card', 1.35, { y: 24, duration: 0.55 });
+        M.layerReveal(gsap, tl, '.line-head .badge, .line-head .tag', 1.7, { scaleFrom: 0.6, duration: 0.4, stagger: 0.12 });
+        // Big result number rolls 0 -> target.
+        M.countUp(gsap, tl, '.line-stat', 1.9, { duration: 1.6 });
+        // The area fades up under the line, then the curve draws itself L -> R.
+        M.fadeUp(gsap, tl, '.area', 2.4, { y: 20, duration: 0.5 });
+        M.drawOn(gsap, tl, '.curve', 2.55, { duration: 1.5 });
+        // The peak dot pops once the line reaches it.
+        M.layerReveal(gsap, tl, '.peak-halo, .peak-dot', 3.95, { scaleFrom: 0.2, duration: 0.4, stagger: 0.08, origin: '50% 50%' });
+        // Axis ends, then the curve-end callouts, then the before/after annotations.
+        M.fadeUp(gsap, tl, '.line-axis span', 4.2, { y: 14, duration: 0.45, stagger: 0.12 });
+        M.fadeUp(gsap, tl, '.line-callout', 4.35, { y: 12, duration: 0.45, stagger: 0.15 });
+        M.fadeUp(gsap, tl, '.line-annot .tag', 4.55, { y: 14, duration: 0.45, stagger: 0.15 });
+        // Footer last.
+        M.fadeUp(gsap, tl, '.canvas-footer', 4.95, { duration: 0.5 });
+        return tl;
+      }
+    };
+  </script>
+</body>
+</html>

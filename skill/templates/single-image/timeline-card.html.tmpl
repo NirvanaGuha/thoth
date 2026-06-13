@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<!--
+  Thoth single-image template: timeline-card
+  Best for: a chronological "how X evolved" / roadmap / history post — a vertical
+            timeline of dated milestones read top -> bottom.
+            (cf. catalog "Timeline".)
+
+  Content fields (from render.js):
+    eyebrow        optional   small uppercase caption above the headline
+    headline       required   the title (e.g. "How our retention stack evolved")
+    pill           optional   one word/phrase punched into the lockup's display pill
+    subhead        optional   one muted line under the lockup
+    item1_label    required   FIRST (earliest) event title — top of the timeline
+    item1_date     optional   a short date/era tag for event 1 (e.g. "2022")
+    item1_desc     optional   one short line under event 1's label
+    item2_label..item5_label  optional   later events, earliest -> latest (top -> down)
+    item2_date..item5_date     optional   matching date tags
+    item2_desc..item5_desc     optional   matching one-line descriptions
+    type_label     optional   footer genre label (e.g. "Story")
+    attribution    optional   default: handle
+
+  Renders 3–5 chronological events. Each event is a FIXED numbered slot wrapped in
+  a single conditional on its label, so unused slots vanish and one .event selector
+  animates them all in DOM order (earliest -> latest). The mustache engine nests,
+  but itemN_date / itemN_desc stay bare variables that collapse via the
+  .event-date:empty / .event-desc:empty rules when absent — no inner conditional.
+
+  THE SPINE: a single inline SVG <line> runs down the centre of a fixed-width left
+  rail, spanning the FULL height of the event stack (height:100% of the stage). Its
+  length therefore always tracks however many rows render — there is no hardcoded
+  spine length to fall out of sync with the item count. The line is given the
+  .spine class and drawn top -> bottom by M.drawOn (stroke-dashoffset). A node dot
+  sits in the rail beside each event; the dot + card pop in synced to the draw.
+
+  Re-skin: each event is a kit "sticker" .card — a palette SWATCH fill (.fill-1..5),
+  the kit outline (var(--card-stroke) / -w), kit corner radius (var(--card-radius))
+  and the kit drop-shadow. The date rides in a dashed .tag pill, a bold label and a
+  muted desc sit under it. The spine + node dots take their colour from the brand
+  ink / accent tokens via CSS (SVG presentation set in the stylesheet, never
+  hardcoded), so a persona's brand.yaml restyles the whole family at once. Matches
+  steps-card / layers-card / funnel-card lockup, persona font, gradient bg, footer,
+  and density.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <style>{{tokens_css}}{{base_css}}
+    .timeline-headline { max-width: 880px; margin-top: var(--space-3); margin-bottom: var(--space-2); }
+    .timeline-headline .pill { font-size: 0.92em; }
+    .subtitle { margin-bottom: var(--space-4); }
+
+    /* The timeline stage: a centered column of event rows that fills the leftover
+       canvas height. position:relative anchors the absolute spine line. */
+    .timeline {
+      position: relative;
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: var(--space-3);
+    }
+
+    /* The vertical spine: one inline SVG pinned down the centre of the left rail,
+       spanning the full stage height so its length always matches the rendered
+       rows. preserveAspectRatio="none" lets the 0..100 viewBox stretch to the
+       real pixel height; the <line> is drawn top -> bottom by M.drawOn. Sits
+       BEHIND the node dots (z-index) and ignores pointer/layout via absolute. */
+    .timeline-spine {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      width: var(--rail-w);
+      height: 100%;
+      z-index: 0;
+      overflow: visible;
+    }
+    .timeline-spine .spine {
+      stroke: var(--brand-ink);
+      stroke-width: 4;
+      stroke-linecap: round;
+      fill: none;
+    }
+
+    /* One event row: a fixed-width rail (holds the node dot, lines up with the
+       spine) + the sticker card to its right. align-items:center keeps the node
+       dot vertically centred on its card. */
+    .event {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      gap: var(--space-4);
+    }
+
+    /* Left rail — same width as the spine SVG so the node dot lands ON the line.
+       flex:0 0 keeps it fixed while the card flexes. */
+    .event-rail {
+      flex: 0 0 var(--rail-w);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    /* Node dot: a kit-styled marker centred on the spine. Accent fill ringed by
+       the brand bg so it reads as a punched node over the ink line. */
+    .event-node {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: var(--brand-accent);
+      border: 5px solid var(--brand-bg);
+      box-shadow: 0 0 0 3px var(--brand-ink);
+    }
+
+    /* The event card — inherits the kit sticker look from .card; the per-event
+       .fill-N class supplies a palette swatch. Padding is tightened from the kit
+       default so five rows + gaps fit the usable height. flex:1 fills the row. */
+    .event-card {
+      flex: 1 1 auto;
+      min-width: 0;
+      padding: var(--space-3) var(--space-4);
+    }
+
+    /* Date tag rides on its own line above the label, in a dashed sticker pill. */
+    .event-date {
+      margin-bottom: var(--space-1);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    /* Bare {{itemN_date}} renders empty when absent -> collapse the tag. */
+    .event-date:empty { display: none; }
+
+    .event-label {
+      display: block;
+      font-family: var(--font-display);
+      font-weight: var(--weight-headline);
+      font-size: 40px;
+      line-height: 1.0;
+      letter-spacing: -0.02em;
+      color: var(--brand-ink);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .event-desc {
+      font-family: var(--font-body);
+      font-size: var(--size-caption);
+      font-weight: var(--weight-body);
+      line-height: var(--leading-normal);
+      color: var(--brand-muted);
+      margin-top: 6px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
+    }
+    /* Bare {{itemN_desc}} renders empty when absent -> collapse the line. */
+    .event-desc:empty { display: none; }
+
+    /* Rail width drives both the spine SVG width and the node column, so the dot
+       always lands on the line. One knob keeps them in sync. */
+    .timeline { --rail-w: 56px; }
+  </style>
+</head>
+<body>
+  <div class="canvas">
+    <header class="canvas-header">
+      {{#eyebrow}}<span class="text-caption">{{eyebrow}}</span>{{/eyebrow}}
+      <span class="accent-dot"></span>
+    </header>
+
+    <h1 class="text-headline-sm timeline-headline lockup">
+      <span>{{headline}}</span>{{#pill}} <span class="pill">{{pill}}</span>{{/pill}}
+    </h1>
+    {{#subhead}}<p class="subtitle">{{subhead}}</p>{{/subhead}}
+
+    <!-- Event rows in DOM order EARLIEST -> LATEST (top -> bottom). item1 = top,
+         highest-numbered = bottom. The spine SVG is a sibling pinned down the rail
+         centre; the per-event .fill-N class sets the swatch. The node dot sits in
+         the rail beside each card. drawOn animates the .spine line; the dots +
+         cards reveal in chronological order synced to the draw. -->
+    <div class="timeline">
+      <svg class="timeline-spine" viewBox="0 0 10 100" preserveAspectRatio="none" aria-hidden="true">
+        <line class="spine" x1="5" y1="0" x2="5" y2="100"></line>
+      </svg>
+
+      {{#item1_label}}<div class="event">
+        <div class="event-rail"><span class="event-node"></span></div>
+        <div class="event-card card fill-1">
+          <span class="tag event-date">{{item1_date}}</span>
+          <span class="event-label">{{item1_label}}</span>
+          <span class="event-desc">{{item1_desc}}</span>
+        </div>
+      </div>{{/item1_label}}
+      {{#item2_label}}<div class="event">
+        <div class="event-rail"><span class="event-node"></span></div>
+        <div class="event-card card fill-2">
+          <span class="tag event-date">{{item2_date}}</span>
+          <span class="event-label">{{item2_label}}</span>
+          <span class="event-desc">{{item2_desc}}</span>
+        </div>
+      </div>{{/item2_label}}
+      {{#item3_label}}<div class="event">
+        <div class="event-rail"><span class="event-node"></span></div>
+        <div class="event-card card fill-3">
+          <span class="tag event-date">{{item3_date}}</span>
+          <span class="event-label">{{item3_label}}</span>
+          <span class="event-desc">{{item3_desc}}</span>
+        </div>
+      </div>{{/item3_label}}
+      {{#item4_label}}<div class="event">
+        <div class="event-rail"><span class="event-node"></span></div>
+        <div class="event-card card fill-4">
+          <span class="tag event-date">{{item4_date}}</span>
+          <span class="event-label">{{item4_label}}</span>
+          <span class="event-desc">{{item4_desc}}</span>
+        </div>
+      </div>{{/item4_label}}
+      {{#item5_label}}<div class="event">
+        <div class="event-rail"><span class="event-node"></span></div>
+        <div class="event-card card fill-5">
+          <span class="tag event-date">{{item5_date}}</span>
+          <span class="event-label">{{item5_label}}</span>
+          <span class="event-desc">{{item5_desc}}</span>
+        </div>
+      </div>{{/item5_label}}
+    </div>
+
+    <footer class="canvas-footer">
+      <span class="handle">{{attribution}}</span>
+      <span>{{type_label}}</span>
+    </footer>
+  </div>
+
+  <script>
+    /* Animation spec — composes shared primitives from window.__thothMotion,
+       which render.js injects in GIF mode. Static PNG mode never calls build(),
+       so the card renders in its final resting state from CSS.
+
+       Signature beat: M.drawOn draws the spine line top -> bottom, and the node
+       dots + event cards reveal in chronological order staggered to track the
+       line as it grows. One reveal primitive per element group (drawOn for the
+       spine, layerReveal for the dots, rowReveal for the cards) — no overlapping
+       opacity tweens, matching the rest of the family. */
+    window.__thothAnim = {
+      duration: 5.4,
+      build: function (gsap) {
+        var M = window.__thothMotion, tl = gsap.timeline({ paused: true });
+        M.fadeUp(gsap, tl, '.canvas-header', 0.15, { y: -24, duration: 0.5 });
+        M.fadeUp(gsap, tl, '.timeline-headline', 0.45, { y: 28, duration: 0.55 });
+        M.layerReveal(gsap, tl, '.pill', 0.95, { scaleFrom: 0.5, duration: 0.4 });
+        M.fadeUp(gsap, tl, '.subtitle', 1.15, { y: 16, duration: 0.5 });
+
+        // The spine draws top -> bottom; the dots + cards pop in chronological
+        // order timed to track the line growing past each node.
+        M.drawOn(gsap, tl, '.spine', 1.5, { duration: 2.4 });
+        M.layerReveal(gsap, tl, '.event-node', 1.7, { scaleFrom: 0.3, duration: 0.4, stagger: 0.5 });
+        M.rowReveal(gsap, tl, '.event-card', 1.8, { x: 36, duration: 0.5, stagger: 0.5 });
+
+        M.fadeUp(gsap, tl, '.canvas-footer', 4.9, { duration: 0.5 });
+        return tl;
+      }
+    };
+  </script>
+</body>
+</html>

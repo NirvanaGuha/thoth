@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<!--
+  Thoth single-image template: bar-chart-card  (sticker re-skin)
+  Best for: a "data / result" post — a before-vs-after or category comparison
+  where the story is the SHAPE of a few bars plus one headline result number.
+
+  Re-skinned to match the steps-card "sticker" aesthetic: a headline .lockup
+  with the punchy metric punched into a .pill, a .subtitle, and the whole chart
+  living inside an outlined, shadowed, swatch-filled sticker .card. Category
+  names ride in dashed .tag pills; a .badge glyph anchors the card header; a
+  .tag delta callout echoes the count-up stat. All colour is token-driven so
+  a persona's brand.yaml restyles it together with steps-card / layers-card.
+
+  Content fields (from render.js):
+    eyebrow        optional   small caption above the headline
+    headline       required   the claim / framing lead-in (target 18–46 chars)
+    pill           optional   the punchy word/metric punched into the lockup pill
+                              (e.g. "TRIGGERED PUSH", "+124%") — keep it short
+    subhead        optional   one muted line under the lockup
+    stat           optional   big result number, animated with countUp (e.g. "+124%", "3.2x")
+    stat_caption   optional   tiny label beside the stat (e.g. "lift in 30-day reactivation")
+    card_label     optional   dashed tag on the card header (e.g. "30-DAY REACTIVATION")
+    bar1_label     required   category label under bar 1 (e.g. "Before")
+    bar1_value     optional   value label shown above bar 1 (e.g. "30%")
+    bar1_pct       required   0–100, bar 1 height as a percentage of the plot area
+    bar2..bar5     optional   same shape; a bar renders only when its _label is present
+    barN_accent    optional   truthy -> tint that bar with --brand-accent (the "winner")
+    attribution    optional   default: {{handle}}
+    type_label     optional   footer genre label (e.g. "RESULT")
+
+  The mustache engine now supports nested {{#...}} sections, but each bar stays a
+  FIXED numbered slot wrapped in a SINGLE {{#barN_label}}...{{/barN_label}}
+  conditional; the value + accent flag inside it are plain {{var}} substitutions.
+  The accent flag becomes a data-accent attribute CSS keys off; an absent value
+  label collapses via the .bar-value:empty rule.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <style>{{tokens_css}}{{base_css}}
+    /* Title lockup — headline lead-in + the punchy metric in a display pill,
+       exactly like steps-card. */
+    .chart-headline { max-width: 940px; margin-bottom: var(--space-2); }
+    .chart-sub { margin-bottom: var(--space-5); }
+
+    /* The result lives inside ONE big sticker card (swatch fill, outline,
+       drop-shadow) — the bar-chart sibling of a steps-card step row. */
+    .chart-card { padding: var(--space-5) var(--space-5) var(--space-4); }
+
+    /* Card header band: a glyph badge + a dashed category tag + the count-up
+       stat on the right, so the card reads dense like a steps row. */
+    .chart-head {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      margin-bottom: var(--space-4);
+    }
+    .chart-head .badge { width: 60px; height: 60px; font-size: 30px; border-radius: 16px; }
+    .chart-stat-wrap { margin-left: auto; text-align: right; line-height: 1; }
+    .chart-stat {
+      font-family: var(--font-display);
+      font-size: var(--size-display);
+      font-weight: var(--weight-display);
+      letter-spacing: -0.03em;
+      color: var(--brand-accent);
+      line-height: 0.9;
+    }
+    .chart-stat-caption {
+      display: block;
+      margin-top: var(--space-1);
+      font-size: var(--size-caption);
+      font-weight: var(--weight-caption);
+      color: var(--brand-muted);
+      letter-spacing: 0.02em;
+      max-width: 300px;
+      margin-left: auto;
+    }
+    .chart-stat-caption:empty { display: none; }
+
+    /* Plot: a row of vertical bars sharing one baseline. Bars are bottom-aligned
+       so they sit ON the baseline; barGrow scales each from its bottom edge. */
+    .chart-plot {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-around;
+      gap: var(--space-5);
+      height: 470px;                         /* the plot area bars are a % of */
+      padding-top: var(--space-3);
+      border-bottom: 3px solid var(--card-stroke);
+    }
+    .bar-col {
+      flex: 1 1 0;
+      max-width: 230px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;             /* value label + bar pinned to baseline */
+      height: 100%;
+    }
+    .bar-value {
+      font-family: var(--font-display);
+      font-size: var(--size-headline-sm);
+      font-weight: var(--weight-display);
+      line-height: 1;
+      color: var(--brand-ink);
+      margin-bottom: var(--space-3);
+    }
+    /* No value provided -> collapse the label so it takes no vertical space. */
+    .bar-value:empty { display: none; }
+
+    /* Resting state = FINAL look: each bar already at its full height (set inline
+       from barN_pct). barGrow only scales the transform (scaleY 0->1) from the
+       bottom, so the static PNG is correct with no JS. Bars get the sticker
+       treatment: outlined + drop-shadow, like the cards. */
+    .bar {
+      width: 100%;
+      background: var(--bar-fill, var(--swatch-3));
+      border: var(--card-stroke-w) solid var(--card-stroke);
+      border-bottom: none;                   /* sits flush on the baseline rule */
+      border-radius: 14px 14px 0 0;
+      box-shadow: 0 6px 0 var(--card-shadow);
+      transform-origin: 50% 100%;            /* grow upward from the baseline */
+    }
+    /* Muted swatch baseline bars cycle through the persona palette so a multi-bar
+       comparison stays colour-coded like steps-card; the accented bar overrides. */
+    .bar-col:nth-child(1) .bar { --bar-fill: var(--swatch-3); }
+    .bar-col:nth-child(2) .bar { --bar-fill: var(--swatch-1); }
+    .bar-col:nth-child(3) .bar { --bar-fill: var(--swatch-4); }
+    .bar-col:nth-child(4) .bar { --bar-fill: var(--swatch-2); }
+    .bar-col:nth-child(5) .bar { --bar-fill: var(--swatch-5); }
+    /* barN_accent renders into data-accent; truthy -> the emphasized "after"
+       bar, painted with the brand accent (ink text labels stay legible). */
+    .bar[data-accent="true"],
+    .bar[data-accent="1"] {
+      background: var(--brand-accent);
+      border-color: var(--card-stroke);
+    }
+
+    /* Category labels sit BELOW the baseline in dashed sticker tags, mirroring
+       the plot columns — denser than plain axis text. */
+    .chart-axis {
+      display: flex;
+      justify-content: space-around;
+      gap: var(--space-5);
+      margin-top: var(--space-4);
+    }
+    .axis-cell {
+      flex: 1 1 0;
+      max-width: 230px;
+      display: flex;
+      justify-content: center;
+    }
+    .axis-cell .tag {
+      background: var(--brand-bg);
+      color: var(--brand-ink);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      max-width: 100%;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    /* The accented column's tag flips to a solid ink chip so the "winner"
+       reads at a glance — same ink/bg contrast as the .badge. */
+    .axis-cell.is-accent .tag {
+      background: var(--brand-ink);
+      color: var(--brand-bg);
+      border-style: solid;
+    }
+  </style>
+</head>
+<body>
+  <div class="canvas">
+    <header class="canvas-header">
+      {{#eyebrow}}<span class="text-caption">{{eyebrow}}</span>{{/eyebrow}}
+      <span class="accent-dot"></span>
+    </header>
+
+    <main style="flex: 1; display: flex; flex-direction: column; justify-content: center;">
+      <h1 class="text-headline chart-headline lockup">
+        <span>{{headline}}</span>{{#pill}} <span class="pill">{{pill}}</span>{{/pill}}
+      </h1>
+      {{#subhead}}<p class="subtitle chart-sub">{{subhead}}</p>{{/subhead}}
+
+      <div class="card fill-1 chart-card">
+        <div class="chart-head">
+          <span class="badge">&#9650;</span>
+          {{#card_label}}<span class="tag">{{card_label}}</span>{{/card_label}}
+          {{#stat}}<span class="chart-stat-wrap">
+            <span class="text-display chart-stat">{{stat}}</span>
+            <span class="chart-stat-caption">{{stat_caption}}</span>
+          </span>{{/stat}}
+        </div>
+
+        <div class="chart-plot">
+          {{#bar1_label}}<div class="bar-col"><span class="bar-value">{{bar1_value}}</span><div class="bar" data-accent="{{bar1_accent}}" style="height: {{bar1_pct}}%;"></div></div>{{/bar1_label}}
+          {{#bar2_label}}<div class="bar-col"><span class="bar-value">{{bar2_value}}</span><div class="bar" data-accent="{{bar2_accent}}" style="height: {{bar2_pct}}%;"></div></div>{{/bar2_label}}
+          {{#bar3_label}}<div class="bar-col"><span class="bar-value">{{bar3_value}}</span><div class="bar" data-accent="{{bar3_accent}}" style="height: {{bar3_pct}}%;"></div></div>{{/bar3_label}}
+          {{#bar4_label}}<div class="bar-col"><span class="bar-value">{{bar4_value}}</span><div class="bar" data-accent="{{bar4_accent}}" style="height: {{bar4_pct}}%;"></div></div>{{/bar4_label}}
+          {{#bar5_label}}<div class="bar-col"><span class="bar-value">{{bar5_value}}</span><div class="bar" data-accent="{{bar5_accent}}" style="height: {{bar5_pct}}%;"></div></div>{{/bar5_label}}
+        </div>
+        <div class="chart-axis">
+          {{#bar1_label}}<div class="axis-cell"><span class="tag">{{bar1_label}}</span></div>{{/bar1_label}}
+          {{#bar2_label}}<div class="axis-cell is-accent"><span class="tag">{{bar2_label}}</span></div>{{/bar2_label}}
+          {{#bar3_label}}<div class="axis-cell"><span class="tag">{{bar3_label}}</span></div>{{/bar3_label}}
+          {{#bar4_label}}<div class="axis-cell"><span class="tag">{{bar4_label}}</span></div>{{/bar4_label}}
+          {{#bar5_label}}<div class="axis-cell"><span class="tag">{{bar5_label}}</span></div>{{/bar5_label}}
+        </div>
+      </div>
+    </main>
+
+    <footer class="canvas-footer">
+      <span class="handle">{{attribution}}</span>
+      <span>{{type_label}}</span>
+    </footer>
+  </div>
+
+  <script>
+    /* Animation spec — composes shared primitives from window.__thothMotion,
+       which render.js injects in GIF mode. Static PNG mode never calls build(),
+       so the card renders in its final resting state from CSS + inline heights.
+       Signature primitives kept: barGrow (bars grow UP from the baseline) +
+       countUp (the headline result number). */
+    window.__thothAnim = {
+      duration: 5.2,
+      build: function (gsap) {
+        var M = window.__thothMotion, tl = gsap.timeline({ paused: true });
+        // Title block rises in, then the metric pill pops.
+        M.fadeUp(gsap, tl, '.canvas-header', 0.15, { y: -24, duration: 0.5 });
+        M.fadeUp(gsap, tl, '.chart-headline', 0.4, { y: 28, duration: 0.55 });
+        M.layerReveal(gsap, tl, '.pill', 0.85, { scaleFrom: 0.5, duration: 0.4 });
+        M.fadeUp(gsap, tl, '.chart-sub', 1.05, { y: 16, duration: 0.5 });
+        // Sticker card + its header badge/tag settle in.
+        M.fadeUp(gsap, tl, '.chart-card', 1.35, { y: 24, duration: 0.55 });
+        M.layerReveal(gsap, tl, '.chart-head .badge, .chart-head .tag', 1.7, { scaleFrom: 0.6, duration: 0.4, stagger: 0.12 });
+        // Big result number rolls 0 -> target.
+        M.countUp(gsap, tl, '.chart-stat', 1.9, { duration: 1.6 });
+        // Bars grow up from the baseline, staggered left-to-right.
+        M.barGrow(gsap, tl, '.bar', 2.3, { duration: 0.7, stagger: 0.2 });
+        // Value labels above the bars, then the category tags below.
+        M.fadeUp(gsap, tl, '.bar-value', 3.05, { y: 18, duration: 0.5, stagger: 0.2 });
+        M.fadeUp(gsap, tl, '.axis-cell', 3.45, { y: 14, duration: 0.5, stagger: 0.2 });
+        // Footer last.
+        M.fadeUp(gsap, tl, '.canvas-footer', 4.4, { duration: 0.5 });
+        return tl;
+      }
+    };
+  </script>
+</body>
+</html>

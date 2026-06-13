@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<!--
+  Thoth single-image template: layers-card
+  Best for: a "N layers of X" framework post — concentric nested model
+            (cf. "4 Layers of a Viral Infographic", "6 Layers of Content Strategy").
+  Content fields (from render.js):
+    eyebrow        optional   small caption above the headline
+    headline       required   the framework name (e.g. "The 4 layers of retention messaging")
+    pill           optional   one word/phrase punched into the lockup's display pill
+    subhead        optional   one muted line under the lockup
+    layer1_label   required   OUTERMOST layer label (largest frame, at back)
+    layer1_desc    optional   one-line description for layer 1
+    layer2_label   optional   next layer in ... up to
+    layer5_label   optional   INNERMOST layer label (smallest frame, in front)
+    layerN_desc    optional   one-line description for layer N
+    type_label     optional   footer tag (e.g. "Framework")
+    attribution    optional   default: {{handle}}
+
+  Use FIXED numbered slots layer1..layer5 (the mustache engine has no loops).
+  Each slot is wrapped in {{#layerN_label}}...{{/layerN_label}} so unused
+  slots vanish. layer1 = outermost/back, highest-numbered = innermost/front.
+  Conditionals MAY now nest (render.js repeats to a fixpoint), but layerN_desc
+  is still emitted as a bare {{layerN_desc}} so an empty desc just collapses via
+  the .layer-desc:empty rule — no inner {{#layerN_desc}} needed.
+
+  Re-skin: each concentric frame is a kit "sticker" — a palette SWATCH fill
+  (var(--swatch-1)..var(--swatch-5)), the kit outline (var(--card-stroke) /
+  var(--card-stroke-w)), kit corner radius (var(--card-radius)) and the kit
+  drop-shadow, so the stack reads as nested stickers under any persona's brand.
+  A square .badge numbers each layer outer->inner (1 = outermost), and the
+  label/desc sit in a top band that stays visible as smaller frames nest in
+  front. Matches steps-card's lockup, persona font, gradient bg, footer, density.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <style>{{tokens_css}}{{base_css}}
+    .layers-headline { max-width: 880px; margin-top: var(--space-3); margin-bottom: var(--space-2); }
+    .layers-headline .pill { font-size: 0.92em; }
+    .subtitle { margin-bottom: var(--space-4); }
+
+    /* Relatively-positioned stage the absolute frames center inside. */
+    .layers-stack {
+      position: relative;
+      flex: 1;
+      margin-top: var(--space-3);
+      min-height: 0;
+    }
+
+    /* Each concentric frame, styled as a kit sticker. Centered horizontally;
+       pinned to the bottom of the stage so they nest. Width + top shrink/grow
+       per layer (set in the slot styles below). The label band sits at the TOP
+       of the frame so every layer stays legible as smaller frames nest in
+       front. Inherits the kit outline / radius / drop-shadow from .card; the
+       per-layer fill class supplies a palette swatch. */
+    .layer {
+      position: absolute;
+      left: 50%;
+      bottom: 0;
+      transform: translateX(-50%);
+      padding: var(--space-3) var(--space-4);
+      display: flex;
+      align-items: flex-start;          /* label rides the exposed TOP band, not the covered center */
+      gap: var(--space-3);
+      overflow: hidden;
+    }
+
+    .layer-body { flex: 1 1 auto; min-width: 0; }
+    .layer-label {
+      display: block;                   /* stack label over desc (matches steps-card) */
+      font-family: var(--font-display);
+      font-weight: var(--weight-headline);
+      font-size: 40px;
+      line-height: 1.0;
+      letter-spacing: -0.02em;
+      color: var(--brand-ink);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .layer-desc {
+      font-family: var(--font-body);
+      font-size: var(--size-caption);
+      font-weight: var(--weight-body);
+      line-height: var(--leading-normal);
+      color: var(--brand-muted);
+      margin-top: 6px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
+    }
+    /* Bare {{layerN_desc}} renders empty when absent -> collapse the line. */
+    .layer-desc:empty { display: none; }
+
+    /* Per-layer geometry. layer1 = outermost (widest, tallest, at back); each
+       inner layer is narrower and its top is stepped down by one label band
+       (--space-8 = 128px) so the parent's badge + label + desc stay visible.
+       Frames pin to the bottom of the stage so they nest; only the TOP band of
+       each frame shows (its body is covered by the next inner frame). z-index
+       keeps the smaller frames on top. Fill colours come from the kit palette
+       swatches via the .fill-N classes on the element (never hardcoded). */
+    .l1 { width: 100%; top: 0;                          z-index: 1; }
+    .l2 { width: 88%;  top: var(--space-8);             z-index: 2; }
+    .l3 { width: 77%;  top: calc(var(--space-8) * 2);   z-index: 3; }
+    .l4 { width: 66%;  top: calc(var(--space-8) * 3);   z-index: 4; }
+    .l5 { width: 55%;  top: calc(var(--space-8) * 4);   z-index: 5; }
+  </style>
+</head>
+<body>
+  <div class="canvas">
+    <header class="canvas-header">
+      {{#eyebrow}}<span class="text-caption">{{eyebrow}}</span>{{/eyebrow}}
+      <span class="accent-dot"></span>
+    </header>
+
+    <h1 class="text-headline-sm layers-headline lockup">
+      <span>{{headline}}</span>{{#pill}} <span class="pill">{{pill}}</span>{{/pill}}
+    </h1>
+    {{#subhead}}<p class="subtitle">{{subhead}}</p>{{/subhead}}
+
+    <!-- Concentric sticker frames. DOM order is INNERMOST -> OUTERMOST so the
+         layerReveal stagger pops the center frame in first, then outward.
+         z-index (set in CSS) keeps the smaller frames visually on top. The
+         badge number is fixed per slot so it reads outer->inner = 1->N. -->
+    <div class="layers-stack">
+      {{#layer5_label}}<div class="layer l5 card fill-5">
+        <span class="badge">5</span>
+        <div class="layer-body">
+          <span class="layer-label">{{layer5_label}}</span>
+          <span class="layer-desc">{{layer5_desc}}</span>
+        </div>
+      </div>{{/layer5_label}}
+      {{#layer4_label}}<div class="layer l4 card fill-4">
+        <span class="badge">4</span>
+        <div class="layer-body">
+          <span class="layer-label">{{layer4_label}}</span>
+          <span class="layer-desc">{{layer4_desc}}</span>
+        </div>
+      </div>{{/layer4_label}}
+      {{#layer3_label}}<div class="layer l3 card fill-3">
+        <span class="badge">3</span>
+        <div class="layer-body">
+          <span class="layer-label">{{layer3_label}}</span>
+          <span class="layer-desc">{{layer3_desc}}</span>
+        </div>
+      </div>{{/layer3_label}}
+      {{#layer2_label}}<div class="layer l2 card fill-2">
+        <span class="badge">2</span>
+        <div class="layer-body">
+          <span class="layer-label">{{layer2_label}}</span>
+          <span class="layer-desc">{{layer2_desc}}</span>
+        </div>
+      </div>{{/layer2_label}}
+      {{#layer1_label}}<div class="layer l1 card fill-1">
+        <span class="badge">1</span>
+        <div class="layer-body">
+          <span class="layer-label">{{layer1_label}}</span>
+          <span class="layer-desc">{{layer1_desc}}</span>
+        </div>
+      </div>{{/layer1_label}}
+    </div>
+
+    <footer class="canvas-footer">
+      <span class="handle">{{attribution}}</span>
+      <span>{{type_label}}</span>
+    </footer>
+  </div>
+
+  <script>
+    /* Animation spec — composes shared primitives from window.__thothMotion,
+       which render.js injects in GIF mode. Static PNG mode never calls build(),
+       so the card renders in its final resting state from CSS. */
+    window.__thothAnim = {
+      duration: 5.2,
+      build: function (gsap) {
+        var M = window.__thothMotion, tl = gsap.timeline({ paused: true });
+        M.fadeUp(gsap, tl, '.canvas-header', 0.15, { y: -24, duration: 0.5 });
+        M.fadeUp(gsap, tl, '.layers-headline', 0.45, { y: 28, duration: 0.55 });
+        M.layerReveal(gsap, tl, '.pill', 0.95, { scaleFrom: 0.5, duration: 0.4 });
+        M.fadeUp(gsap, tl, '.subtitle', 1.15, { y: 16, duration: 0.5 });
+        // .layer elements are in DOM order innermost -> outermost, so the
+        // stagger pops the center frame first, then each frame outward.
+        M.layerReveal(gsap, tl, '.layer', 1.55, {
+          scaleFrom: 0.55, origin: '50% 100%', duration: 0.55, stagger: 0.5
+        });
+        M.fadeUp(gsap, tl, '.canvas-footer', 4.5, { duration: 0.5 });
+        return tl;
+      }
+    };
+  </script>
+</body>
+</html>

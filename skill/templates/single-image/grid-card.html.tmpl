@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<!--
+  Thoth single-image template: grid-card  (sticker re-skin)
+  Best for: an "N ideas / N things" collection post — a tidy grid of equal-weight
+  cards, each a short idea (cf. the catalog's "Proven LinkedIn Post Ideas" and
+  "Build 5 Landing Pages" grids). It is steps-card's sticker cards laid out in a
+  2-column grid instead of a single column.
+
+  Re-skinned to match the steps-card "sticker" aesthetic: a headline .lockup with
+  one punchy word punched into a .pill, an optional .subtitle, then a 2-column
+  grid of outlined, shadowed, swatch-filled sticker .cards. Every colour is
+  token-driven so a persona's brand.yaml restyles it together with steps-card /
+  matrix-card / layers-card.
+
+  Content fields (from render.js):
+    eyebrow        optional   small uppercase caption above the headline
+    headline       required   the collection claim (target 24–60 chars)
+    pill           optional   one punchy word/phrase punched into the lockup pill
+    subhead        optional   one muted line under the lockup
+
+    card1_title    required   first card title
+    card1_desc     optional   first card one-line description
+    card2_title..card6_title  optional  additional card titles (fixed slots)
+    card2_desc..card6_desc    optional  matching one-line descriptions
+    card1_icon..card6_icon    optional  a single emoji / glyph for the card (per card)
+
+    numbered       optional   truthy -> show a 1..N number badge on each card, in
+                              reading order (left -> right, top -> bottom). The
+                              mustache engine can't count, so the badge digit is
+                              fixed per slot and this single flag toggles the whole
+                              set on/off (matches funnel-card's per-slot badges).
+
+    type_label     optional   footer genre label (e.g. "Educational")
+    attribution    optional   default: handle
+
+  Renders 1–6 cards. Each card is a FIXED numbered slot wrapped in ONE
+  cardN_title conditional section, so unused slots vanish and one .card-cell
+  selector animates them all in DOM order (reading order). Inside a slot,
+  cardN_icon / cardN_desc are bare variable substitutions that collapse via the
+  :empty rule when absent. The number badge is wrapped in a numbered conditional
+  section so it toggles for the whole grid at once.
+
+  Swatch cycling: the kit ships five palette swatches (.fill-1..5). The grid
+  takes up to SIX cards, so the sixth slot reuses .fill-1 — the palette repeats
+  rather than introducing a hardcoded colour. With 6 cards the row 1 / row 2
+  colour pairs read as (1,2)(3,4)(5,1), keeping every cell distinct from its
+  immediate left/right neighbour.
+
+  Layout: a 2-column CSS grid. 2 cards -> one row, 4 cards -> 2x2, 6 cards ->
+  2x3. The grid auto-flows rows, so an odd count (3 or 5) leaves the last cell of
+  the final row empty and the rest stay equal-width. Cell padding is tightened
+  from the kit default (like funnel-card) so the dense 6-card case still fits the
+  usable canvas with no overflow.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <style>{{tokens_css}}{{base_css}}
+    .grid-headline { max-width: 940px; margin-bottom: var(--space-2); }
+    .grid-sub { margin-bottom: var(--space-4); }
+
+    /* The grid stage: a 2-column grid of equal-height sticker cells, centered in
+       the remaining vertical space. min-height:0 lets the grid shrink to fit the
+       usable canvas (the matrix-card / funnel-card fit pattern). */
+    .grid-stage {
+      flex: 1;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-auto-rows: 1fr;
+      gap: var(--space-3);
+      align-content: center;
+    }
+
+    /* Each idea = a kit sticker (swatch fill, outline, drop-shadow). The resting
+       state is the FINAL look; colorWave only sweeps the fill colour in, so the
+       static PNG renders correctly with no JS. Padding is tightened from the kit
+       default so six cells + gaps fit the usable height. */
+    .card-cell {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: var(--space-2);
+      padding: var(--space-3) var(--space-4);
+      min-width: 0;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    /* Badge + icon ride on one line above the title. The number badge reuses the
+       kit .badge sticker glyph, sized down to suit the denser grid cell. */
+    .card-head {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      min-width: 0;
+    }
+    .card-cell .badge {
+      width: 56px; height: 56px;
+      border-radius: 16px;
+      font-size: 30px;
+    }
+    .card-icon {
+      font-size: 44px;
+      line-height: 1;
+    }
+    /* A bare cardN_icon renders empty when absent -> collapse the glyph box so
+       the title sits flush. */
+    .card-icon:empty { display: none; }
+    /* When neither a badge nor an icon renders, the head row is empty -> drop it
+       so the title rides at the top of the cell with no dead space. */
+    .card-head:empty { display: none; }
+
+    .card-title {
+      font-family: var(--font-display);
+      font-weight: var(--weight-headline);
+      font-size: 38px;
+      line-height: var(--leading-tight);
+      letter-spacing: -0.02em;
+      color: var(--brand-ink);
+    }
+    .card-desc {
+      font-family: var(--font-body);
+      font-size: var(--size-caption);
+      font-weight: var(--weight-body);
+      line-height: var(--leading-normal);
+      color: var(--brand-muted);
+    }
+    /* A bare cardN_desc renders empty when absent -> collapse the line. */
+    .card-desc:empty { display: none; }
+  </style>
+</head>
+<body>
+  <div class="canvas">
+    <header class="canvas-header">
+      {{#eyebrow}}<span class="text-caption">{{eyebrow}}</span>{{/eyebrow}}
+      <span class="accent-dot"></span>
+    </header>
+
+    <main style="flex: 1; display: flex; flex-direction: column; justify-content: center; min-height: 0;">
+      <h1 class="text-headline grid-headline lockup">
+        <span>{{headline}}</span>{{#pill}} <span class="pill">{{pill}}</span>{{/pill}}
+      </h1>
+      {{#subhead}}<p class="subtitle grid-sub">{{subhead}}</p>{{/subhead}}
+
+      <!-- Cards in DOM order = reading order (left -> right, top -> bottom). The
+           per-slot .fill-N class supplies a palette swatch; the sixth slot reuses
+           fill-1 to cycle the five-swatch palette. The number badge is fixed per
+           slot and toggled for the whole grid by the numbered flag. -->
+      <div class="grid-stage">
+        {{#card1_title}}<div class="card-cell card fill-1">
+          <div class="card-head">
+            {{#numbered}}<span class="badge">1</span>{{/numbered}}
+            <span class="card-icon">{{card1_icon}}</span>
+          </div>
+          <p class="card-title">{{card1_title}}</p>
+          <p class="card-desc">{{card1_desc}}</p>
+        </div>{{/card1_title}}
+        {{#card2_title}}<div class="card-cell card fill-2">
+          <div class="card-head">
+            {{#numbered}}<span class="badge">2</span>{{/numbered}}
+            <span class="card-icon">{{card2_icon}}</span>
+          </div>
+          <p class="card-title">{{card2_title}}</p>
+          <p class="card-desc">{{card2_desc}}</p>
+        </div>{{/card2_title}}
+        {{#card3_title}}<div class="card-cell card fill-3">
+          <div class="card-head">
+            {{#numbered}}<span class="badge">3</span>{{/numbered}}
+            <span class="card-icon">{{card3_icon}}</span>
+          </div>
+          <p class="card-title">{{card3_title}}</p>
+          <p class="card-desc">{{card3_desc}}</p>
+        </div>{{/card3_title}}
+        {{#card4_title}}<div class="card-cell card fill-4">
+          <div class="card-head">
+            {{#numbered}}<span class="badge">4</span>{{/numbered}}
+            <span class="card-icon">{{card4_icon}}</span>
+          </div>
+          <p class="card-title">{{card4_title}}</p>
+          <p class="card-desc">{{card4_desc}}</p>
+        </div>{{/card4_title}}
+        {{#card5_title}}<div class="card-cell card fill-5">
+          <div class="card-head">
+            {{#numbered}}<span class="badge">5</span>{{/numbered}}
+            <span class="card-icon">{{card5_icon}}</span>
+          </div>
+          <p class="card-title">{{card5_title}}</p>
+          <p class="card-desc">{{card5_desc}}</p>
+        </div>{{/card5_title}}
+        {{#card6_title}}<div class="card-cell card fill-1">
+          <div class="card-head">
+            {{#numbered}}<span class="badge">6</span>{{/numbered}}
+            <span class="card-icon">{{card6_icon}}</span>
+          </div>
+          <p class="card-title">{{card6_title}}</p>
+          <p class="card-desc">{{card6_desc}}</p>
+        </div>{{/card6_title}}
+      </div>
+    </main>
+
+    <footer class="canvas-footer">
+      <span class="handle">{{attribution}}</span>
+      <span>{{type_label}}</span>
+    </footer>
+  </div>
+
+  <script>
+    /* Animation spec — composes shared primitives from window.__thothMotion,
+       which render.js injects in GIF mode. Static PNG mode never calls build(),
+       so the card renders in its final resting state from CSS.
+
+       The grid cards sweep in via the signature colorWave (grey -> own swatch)
+       in reading order. .card-cell elements are in DOM order = reading order
+       (left -> right, top -> bottom), so a single colorWave with a forward
+       stagger pops them in the order a reader scans the grid — one reveal
+       primitive per element group, like steps-card / matrix-card. */
+    window.__thothAnim = {
+      duration: 5.2,
+      build: function (gsap) {
+        var M = window.__thothMotion, tl = gsap.timeline({ paused: true });
+        M.fadeUp(gsap, tl, '.canvas-header', 0.15, { y: -24, duration: 0.5 });
+        M.fadeUp(gsap, tl, '.grid-headline', 0.45, { y: 28, duration: 0.55 });
+        M.layerReveal(gsap, tl, '.pill', 0.95, { scaleFrom: 0.5, duration: 0.4 });
+        M.fadeUp(gsap, tl, '.grid-sub', 1.15, { y: 16, duration: 0.5 });
+        M.colorWave(gsap, tl, '.card-cell', 1.55, { stagger: 0.4, duration: 0.5, from: 0 });
+        M.fadeUp(gsap, tl, '.canvas-footer', 4.7, { duration: 0.5 });
+        return tl;
+      }
+    };
+  </script>
+</body>
+</html>

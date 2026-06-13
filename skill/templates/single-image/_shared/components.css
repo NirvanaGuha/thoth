@@ -1,0 +1,56 @@
+/*
+ * Thoth component kit — reusable "sticker"-grade building blocks for dense,
+ * reference-style infographic cards. Every visual is token-driven, so a
+ * persona's brand.yaml (palette: + style:) restyles all components at once.
+ * Injected by render.js after base.css.
+ */
+
+/* Title lockup: headline with one word punched into a display "pill". */
+.lockup { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.12em 0.28em; }
+.lockup .pill {
+  display: inline-flex; align-items: center;
+  font-family: var(--font-display); font-weight: 800; letter-spacing: -0.01em;
+  background: var(--brand-accent); color: var(--brand-bg);
+  border-radius: var(--pill-radius);
+  padding: 0.04em 0.4em;
+  box-shadow: 0 6px 0 var(--card-shadow);
+}
+
+/* Sticker card: outlined, filled, rounded block. */
+.card {
+  background: var(--card-fill);
+  border: var(--card-stroke-w) solid var(--card-stroke);
+  border-radius: var(--card-radius);
+  padding: var(--space-4);
+  box-shadow: 0 7px 0 var(--card-shadow);
+}
+
+/* Function color-coding from the persona swatches. */
+.fill-1 { --card-fill: var(--swatch-1); }
+.fill-2 { --card-fill: var(--swatch-2); }
+.fill-3 { --card-fill: var(--swatch-3); }
+.fill-4 { --card-fill: var(--swatch-4); }
+.fill-5 { --card-fill: var(--swatch-5); }
+
+/* Number / glyph badge for sticker cards. */
+.badge {
+  flex: 0 0 auto; width: 68px; height: 68px;
+  border-radius: 18px;
+  background: var(--brand-ink); color: var(--brand-bg);
+  font-family: var(--font-display); font-weight: 800; font-size: 36px; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* Inline dashed tag pill. */
+.tag {
+  display: inline-flex; align-items: center;
+  border: 2px dashed var(--card-stroke);
+  border-radius: var(--pill-radius);
+  padding: 0.06em 0.5em; font-weight: 600; font-size: var(--size-caption);
+}
+
+/* Subtitle line under a lockup. */
+.subtitle {
+  font-size: var(--size-body); color: var(--brand-muted);
+  line-height: var(--leading-loose); max-width: 880px;
+}

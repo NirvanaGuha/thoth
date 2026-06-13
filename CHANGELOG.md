@@ -2,6 +2,30 @@
 
 All notable changes to Thoth are documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] — 2026-06-14
+
+### Added
+- **Animated GIF infographics.** Every generated post now ships with a matching animated infographic. `/thoth` and `/thoth daily` auto-attach a looping GIF; opt out with `--no-image`.
+- **14-template infographic library** at `skill/templates/single-image/`, covering the common LinkedIn formats:
+  - Numbers / charts: `stat-card`, `line-chart-card`, `bar-chart-card`.
+  - Compare / decide: `comparison-card`, `matrix-card` (2×2).
+  - Sequence / flow: `steps-card`, `flowchart-card`, `cycle-card`, `timeline-card`.
+  - Structure: `layers-card`, `funnel-card`, `venn-card`, `spectrum-card`, `grid-card`.
+- **POV-driven type selection.** The generator names the post's core point of view and routes it to the best-fit template by the *shape of the argument* (magnitude → stat, trend → line-chart, contrast → bar-chart, depth → layers, …); falls back to a static card, or skips the image, when nothing fits cleanly.
+- **Auto-derived per-persona brand** (`skill/scripts/derive-brand.js`). A missing `brand.yaml` is now derived from the persona's dominant/secondary archetype + tone — accent/ink/background, a 5-swatch palette, display/body fonts, card style + gradient — with no interview. Explicit colours always override.
+- **Motion library** (`skill/templates/single-image/_shared/motion.js`) — reusable, seek-deterministic reveal primitives (fade-up, count-up, row/layer reveal, bar-grow, colour-wave, SVG draw-on).
+- **Component kit** (`skill/templates/single-image/_shared/components.css`) — title-lockup pill, sticker cards, palette fills, badges, tags, subtitle. Token-driven, so a persona restyles every template at once.
+
+### Changed
+- **Canvas is now portrait 4:5 (1080×1350)** — LinkedIn's maximum feed real estate (previously 1200×1200 square).
+- **`/thoth image` defaults to an animated GIF** held inside LinkedIn's animation envelope (under 5 MB, under 400 frames); pass a `.png` output for a single static frame. The `--variant` set is now the 14 templates above.
+- **`/thoth brand`** first run auto-derives the visual identity from the persona; `/thoth brand setup` is now the explicit colour interview (the override path).
+- `skill/scripts/render.js` gained the GIF pipeline (GSAP timeline seek-capture → `gifski`, with an `ffmpeg` two-pass-palette fallback) and now installs `gsap` alongside `puppeteer-core` in `~/.thoth/cache/render/`. The mustache-lite engine now supports nested conditionals.
+
+### Fixed
+- Consistent spacing between the content and the signature footer across all templates.
+- Label-fit, mid-word-break, and edge-overflow issues in the chart, table, Venn, and layered templates.
+
 ## [1.4.0] — 2026-05-29
 
 ### Added

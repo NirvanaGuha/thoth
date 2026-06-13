@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<!--
+  Thoth single-image template: comparison-card  (sticker re-skin)
+  Best for: a comparison / decision-table post — pit 2–3 OPTIONS against each
+  other across a handful of ATTRIBUTES so one column reads as the clear winner.
+  (cf. catalog "Comparison Chart" / "Process Chart"; "Make a Post Go Viral"
+  3-column compare; "Monetize LinkedIn" data matrix.)
+
+  Re-skinned to the steps-card "sticker" aesthetic: a headline .lockup with the
+  punchy word punched into a .pill, a .subtitle, then a clean grid/table living
+  inside an outlined, shadowed sticker .card. The column headers ride in sticker
+  chips (the winning option flips to a solid ink/accent chip), attribute labels
+  run down the left in dashed .tag pills, and the cells are zebra-tinted with the
+  persona palette swatches for readability. The winning column gets an
+  accent-tinted background so the verdict lands at a glance. All colour is
+  token-driven so a persona's brand.yaml restyles it with steps-card / siblings.
+
+  Content fields (from render.js):
+    eyebrow        optional   small uppercase caption above the headline
+    headline       required   the framing claim / question (target 18–46 chars)
+    pill           optional   one punchy word punched into the lockup pill
+                              (e.g. "WINS", "PERSONALIZED") — keep it short
+    subhead        optional   one muted line under the lockup
+
+    col1_label     required   FIRST option (left data column header)
+    col2_label     required   SECOND option header
+    col3_label     optional   THIRD option header (omit for a 2-option compare)
+    colN_win       optional   truthy on exactly ONE column -> mark it the winner
+                              (accent-tinted column + solid accent header chip)
+
+    corner_label   optional   tiny label for the top-left header corner cell
+                              (e.g. the dimension name, "vs.", "Approach")
+
+    row1_label     required   FIRST attribute compared (left axis label)
+    row2..row5     optional   more attribute labels (fixed slots)
+    cellR_C        optional   the value in row R, column C — SHORT text: a number,
+                              a word, or a glyph (use ✓ / ✗). e.g. cell1_1, cell1_2,
+                              cell1_3 for row 1. A cell renders only if its row +
+                              column are both present; empty cells collapse.
+
+    type_label     optional   footer genre label (e.g. "Comparison")
+    attribution    optional   default: {{handle}}
+
+  The mustache engine supports nested {{#...}} sections (it repeats to a
+  fixpoint), so each data cell nests inside BOTH its column conditional and its
+  row conditional: {{#colN_label}}<cell>{{cellR_N}}</cell>{{/colN_label}} sits
+  inside {{#rowR_label}}...{{/rowR_label}}. A whole row collapses when its
+  rowR_label is absent; a whole column collapses when colN_label is absent (every
+  row keys its Nth cell off the same colN_label). The winner flag becomes a
+  data-win attribute CSS keys off; an absent cell value collapses via .cell:empty.
+
+  LAYOUT NOTE — flex rows (NOT css-grid) keep columns aligned without computing a
+  grid-template for 2 vs 3 columns: every row is a flex container whose value
+  cells are flex:1 1 0, so 2 or 3 columns each fill the row evenly and line up
+  across rows. Max ~3 data columns × ~5 attribute rows fits the canvas.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <style>{{tokens_css}}{{base_css}}
+    .cmp-headline { max-width: 940px; margin-bottom: var(--space-2); }
+    .cmp-sub { margin-bottom: var(--space-5); }
+
+    /* The whole matrix lives inside ONE sticker card (outline + drop-shadow),
+       the comparison sibling of a steps-card step row. White-ish fill so the
+       zebra swatch rows + accent winner column read cleanly on top. */
+    .cmp-card {
+      --card-fill: var(--brand-bg);
+      padding: var(--space-4);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+    }
+
+    /* Every row (header + data) is a flex container. The left axis cell is a
+       fixed-width gutter; value cells share the remaining width evenly so 2 or 3
+       columns line up across all rows. */
+    .cmp-row {
+      display: flex;
+      align-items: stretch;
+      gap: var(--space-2);
+    }
+    .cmp-axis {
+      flex: 0 0 248px;
+      display: flex;
+      align-items: center;
+    }
+    .cmp-cells {
+      flex: 1 1 auto;
+      display: flex;
+      gap: var(--space-2);
+    }
+
+    /* HEADER ROW — option names in sticker chips. The corner cell carries an
+       optional dimension label; the column chips read as the kit .badge/.tag. */
+    .cmp-corner {
+      display: flex;
+      align-items: center;
+      font-family: var(--font-body);
+      font-size: var(--size-caption);
+      font-weight: var(--weight-caption);
+      color: var(--brand-muted);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .cmp-corner:empty { display: none; }
+    .col-head {
+      flex: 1 1 0;
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: var(--space-2) var(--space-2);
+      border-radius: 16px;
+      background: var(--brand-bg);
+      border: var(--card-stroke-w) solid var(--card-stroke);
+      box-shadow: 0 5px 0 var(--card-shadow);
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: 22px;                  /* fits "Personalized"-length labels on one line in a 3-col table */
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+      color: var(--brand-ink);
+      overflow: hidden;
+      overflow-wrap: break-word;        /* wrap multi-word labels at spaces; never break mid-word like "anywhere" did */
+    }
+    /* The winning option's header chip flips to a solid accent chip so the
+       verdict reads at a glance (mirrors bar-chart-card's is-accent axis tag). */
+    .col-head[data-win="true"],
+    .col-head[data-win="1"] {
+      background: var(--brand-accent);
+      color: var(--brand-bg);
+      border-color: var(--card-stroke);
+    }
+
+    /* ATTRIBUTE LABEL — dashed sticker tag down the left, like steps-card tags. */
+    .row-label {
+      width: 100%;
+      background: var(--brand-bg);
+      color: var(--brand-ink);
+      letter-spacing: 0.01em;
+      font-size: var(--size-caption);
+      font-weight: 700;
+      line-height: var(--leading-tight);
+    }
+
+    /* DATA CELL — a sticker tile. Resting state = FINAL look: the per-column
+       winner cells are already accent-tinted (data-win) and the rest carry a
+       zebra swatch per row (set by the row-tint classes below). colorWave only
+       sweeps the colour in, so the static PNG is correct with no JS. */
+    .cell {
+      flex: 1 1 0;
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: var(--space-3) var(--space-2);
+      border-radius: 14px;
+      background: var(--cell-fill, var(--swatch-1));
+      border: var(--card-stroke-w) solid var(--card-stroke);
+      box-shadow: 0 4px 0 var(--card-shadow);
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 32px;
+      line-height: 1.1;
+      letter-spacing: -0.01em;
+      color: var(--brand-ink);
+      overflow: hidden;
+      overflow-wrap: anywhere;          /* long values wrap instead of clipping */
+    }
+    /* A row that exists but whose Nth column cell value is empty still keeps the
+       tile (so columns stay aligned); only a wholly absent column drops its
+       cells. An empty-valued tile just shows blank fill — acceptable, but a
+       value-less cell that is the ONLY child collapses cleanly too. */
+    .cell:empty::after { content: "\2014"; color: var(--brand-muted); opacity: 0.5; }
+
+    /* Zebra row tints — alternate swatches per attribute row for readability,
+       cycling the persona palette like steps-card colour-codes its rows. */
+    .cmp-row.r1 .cell { --cell-fill: var(--swatch-1); }
+    .cmp-row.r2 .cell { --cell-fill: var(--swatch-3); }
+    .cmp-row.r3 .cell { --cell-fill: var(--swatch-2); }
+    .cmp-row.r4 .cell { --cell-fill: var(--swatch-4); }
+    .cmp-row.r5 .cell { --cell-fill: var(--swatch-5); }
+    /* Winner column: every cell flagged data-win paints with the brand accent,
+       overriding the zebra tint so the column reads as one continuous verdict.
+       Ink text stays legible on the accent fill (light-on-dark handled per
+       persona via the accent/bg contrast). */
+    .cmp-row .cell[data-win="true"],
+    .cmp-row .cell[data-win="1"] {
+      background: var(--brand-accent);
+      color: var(--brand-bg);
+      border-color: var(--card-stroke);
+      font-weight: 800;
+    }
+  </style>
+</head>
+<body>
+  <div class="canvas">
+    <header class="canvas-header">
+      {{#eyebrow}}<span class="text-caption">{{eyebrow}}</span>{{/eyebrow}}
+      <span class="accent-dot"></span>
+    </header>
+
+    <main style="flex: 1; display: flex; flex-direction: column; justify-content: center;">
+      <h1 class="text-headline cmp-headline lockup">
+        <span>{{headline}}</span>{{#pill}} <span class="pill">{{pill}}</span>{{/pill}}
+      </h1>
+      {{#subhead}}<p class="subtitle cmp-sub">{{subhead}}</p>{{/subhead}}
+
+      <div class="card cmp-card">
+        <!-- HEADER ROW: corner label + one chip per present option. The chip's
+             data-win is echoed from colN_win so exactly one option flips accent. -->
+        <div class="cmp-row cmp-header">
+          <div class="cmp-axis"><span class="cmp-corner">{{corner_label}}</span></div>
+          <div class="cmp-cells">
+            {{#col1_label}}<div class="col-head" data-win="{{col1_win}}">{{col1_label}}</div>{{/col1_label}}
+            {{#col2_label}}<div class="col-head" data-win="{{col2_win}}">{{col2_label}}</div>{{/col2_label}}
+            {{#col3_label}}<div class="col-head" data-win="{{col3_win}}">{{col3_label}}</div>{{/col3_label}}
+          </div>
+        </div>
+
+        <!-- ATTRIBUTE ROWS: each row keys its Nth cell off the SAME colN_label so
+             a dropped column drops its column of cells everywhere, keeping the
+             grid aligned. Cell winner tint is echoed from colN_win again. -->
+        {{#row1_label}}<div class="cmp-row r1">
+          <div class="cmp-axis"><span class="tag row-label">{{row1_label}}</span></div>
+          <div class="cmp-cells">
+            {{#col1_label}}<div class="cell" data-win="{{col1_win}}">{{cell1_1}}</div>{{/col1_label}}
+            {{#col2_label}}<div class="cell" data-win="{{col2_win}}">{{cell1_2}}</div>{{/col2_label}}
+            {{#col3_label}}<div class="cell" data-win="{{col3_win}}">{{cell1_3}}</div>{{/col3_label}}
+          </div>
+        </div>{{/row1_label}}
+        {{#row2_label}}<div class="cmp-row r2">
+          <div class="cmp-axis"><span class="tag row-label">{{row2_label}}</span></div>
+          <div class="cmp-cells">
+            {{#col1_label}}<div class="cell" data-win="{{col1_win}}">{{cell2_1}}</div>{{/col1_label}}
+            {{#col2_label}}<div class="cell" data-win="{{col2_win}}">{{cell2_2}}</div>{{/col2_label}}
+            {{#col3_label}}<div class="cell" data-win="{{col3_win}}">{{cell2_3}}</div>{{/col3_label}}
+          </div>
+        </div>{{/row2_label}}
+        {{#row3_label}}<div class="cmp-row r3">
+          <div class="cmp-axis"><span class="tag row-label">{{row3_label}}</span></div>
+          <div class="cmp-cells">
+            {{#col1_label}}<div class="cell" data-win="{{col1_win}}">{{cell3_1}}</div>{{/col1_label}}
+            {{#col2_label}}<div class="cell" data-win="{{col2_win}}">{{cell3_2}}</div>{{/col2_label}}
+            {{#col3_label}}<div class="cell" data-win="{{col3_win}}">{{cell3_3}}</div>{{/col3_label}}
+          </div>
+        </div>{{/row3_label}}
+        {{#row4_label}}<div class="cmp-row r4">
+          <div class="cmp-axis"><span class="tag row-label">{{row4_label}}</span></div>
+          <div class="cmp-cells">
+            {{#col1_label}}<div class="cell" data-win="{{col1_win}}">{{cell4_1}}</div>{{/col1_label}}
+            {{#col2_label}}<div class="cell" data-win="{{col2_win}}">{{cell4_2}}</div>{{/col2_label}}
+            {{#col3_label}}<div class="cell" data-win="{{col3_win}}">{{cell4_3}}</div>{{/col3_label}}
+          </div>
+        </div>{{/row4_label}}
+        {{#row5_label}}<div class="cmp-row r5">
+          <div class="cmp-axis"><span class="tag row-label">{{row5_label}}</span></div>
+          <div class="cmp-cells">
+            {{#col1_label}}<div class="cell" data-win="{{col1_win}}">{{cell5_1}}</div>{{/col1_label}}
+            {{#col2_label}}<div class="cell" data-win="{{col2_win}}">{{cell5_2}}</div>{{/col2_label}}
+            {{#col3_label}}<div class="cell" data-win="{{col3_win}}">{{cell5_3}}</div>{{/col3_label}}
+          </div>
+        </div>{{/row5_label}}
+      </div>
+    </main>
+
+    <footer class="canvas-footer">
+      <span class="handle">{{attribution}}</span>
+      <span>{{type_label}}</span>
+    </footer>
+  </div>
+
+  <script>
+    /* Animation spec — composes shared primitives from window.__thothMotion,
+       which render.js injects in GIF mode. Static PNG mode never calls build(),
+       so the card renders in its final resting state from CSS (winner column
+       already accent-tinted, zebra rows already coloured). */
+    window.__thothAnim = {
+      duration: 5.4,
+      build: function (gsap) {
+        var M = window.__thothMotion, tl = gsap.timeline({ paused: true });
+        // Title block rises in, then the pill pops, then the subhead.
+        M.fadeUp(gsap, tl, '.canvas-header', 0.15, { y: -24, duration: 0.5 });
+        M.fadeUp(gsap, tl, '.cmp-headline', 0.45, { y: 28, duration: 0.55 });
+        M.layerReveal(gsap, tl, '.pill', 0.95, { scaleFrom: 0.5, duration: 0.4 });
+        M.fadeUp(gsap, tl, '.cmp-sub', 1.15, { y: 16, duration: 0.5 });
+        // Column header chips pop in left-to-right.
+        M.layerReveal(gsap, tl, '.col-head', 1.5, { scaleFrom: 0.6, duration: 0.4, stagger: 0.12 });
+        // Attribute rows slide in top-to-bottom (whole row at a time).
+        M.rowReveal(gsap, tl, '.cmp-row.r1, .cmp-row.r2, .cmp-row.r3, .cmp-row.r4, .cmp-row.r5', 2.0, { x: -28, duration: 0.5, stagger: 0.3 });
+        // Cells sweep from muted grey to their zebra / accent colour as they land.
+        M.colorWave(gsap, tl, '.cell', 2.15, { duration: 0.5, stagger: 0.1, from: 0.4 });
+        // VERDICT: pop the winning column (header chip + its cells) so it lands.
+        tl.to('.col-head[data-win="true"], .col-head[data-win="1"], .cell[data-win="true"], .cell[data-win="1"]', {
+          scale: 1.06, duration: 0.28, ease: 'power2.out', transformOrigin: '50% 50%'
+        }, 4.35);
+        tl.to('.col-head[data-win="true"], .col-head[data-win="1"], .cell[data-win="true"], .cell[data-win="1"]', {
+          scale: 1, duration: 0.32, ease: 'power2.inOut'
+        }, 4.63);
+        // Footer last.
+        M.fadeUp(gsap, tl, '.canvas-footer', 4.6, { duration: 0.5 });
+        return tl;
+      }
+    };
+  </script>
+</body>
+</html>

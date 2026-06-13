@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<!--
+  Thoth single-image template: matrix-card  (sticker re-skin)
+  Best for: a "2x2 matrix / quadrant" post — a prioritization or strategy
+  framework where two axes carve the space into four labeled cells
+  (cf. the catalog's "2x2 Matrix" and "How to Write a Hook" 4-cell layouts).
+
+  Re-skinned to match the steps-card "sticker" aesthetic: a headline .lockup
+  with the framework name punched into a .pill, a .subtitle, then a 2x2 grid of
+  outlined, shadowed, swatch-filled sticker .cards. A y-axis label runs UP the
+  left edge and an x-axis label sits along the bottom, each with optional
+  low->high end labels. Every colour is token-driven so a persona's brand.yaml
+  restyles it together with steps-card / layers-card / bar-chart-card.
+
+  Content fields (from render.js):
+    eyebrow        optional   small uppercase caption above the headline
+    headline       required   the framework name / claim (target 18–46 chars)
+    pill           optional   one punchy word/phrase punched into the lockup pill
+    subhead        optional   one muted line under the lockup
+
+    y_axis_label   optional   the vertical axis name (runs up the left edge)
+    y_low          optional   low-end label for the y axis (bottom of the axis)
+    y_high         optional   high-end label for the y axis (top of the axis)
+    x_axis_label   optional   the horizontal axis name (along the bottom)
+    x_low          optional   low-end label for the x axis (left of the axis)
+    x_high         optional   high-end label for the x axis (right of the axis)
+
+    quad_tl_title  required   top-LEFT cell title;  quad_tl_desc optional one line
+    quad_tr_title  required   top-RIGHT cell title; quad_tr_desc optional one line
+    quad_bl_title  required   bottom-LEFT cell title;  quad_bl_desc optional one line
+    quad_br_title  required   bottom-RIGHT cell title; quad_br_desc optional one line
+
+    win_tl / win_tr / win_bl / win_br  optional  truthy on exactly ONE quadrant
+                              marks the "winning" cell — it flips to the brand
+                              accent fill and gets an emphasis pop last.
+
+    type_label     optional   footer genre label (e.g. "Framework")
+    attribution    optional   default: {{handle}}
+
+  Each cell is a FIXED slot wrapped in a SINGLE {{#quad_xx_title}}...{{/...}}
+  conditional; the desc + win flag inside it are plain {{var}} substitutions.
+  The win flag renders into a data-win attribute the CSS keys off; an absent
+  desc collapses via the .cell-desc:empty rule. Axis labels + their end labels
+  are wrapped in their own conditionals so they vanish when unused.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <style>{{tokens_css}}{{base_css}}
+    .matrix-headline { max-width: 940px; margin-bottom: var(--space-2); }
+    .matrix-sub { margin-bottom: var(--space-4); }
+
+    /* The matrix stage: a left gutter for the rotated y-axis label, the 2x2
+       grid, and (below) a bottom band for the x-axis label. Sizes are fixed so
+       the whole figure fits the usable canvas with no overflow. */
+    .matrix-stage {
+      display: grid;
+      grid-template-columns: 72px 1fr;        /* y-axis gutter | grid */
+      grid-template-rows: 1fr auto;           /* grid | x-axis band */
+      gap: var(--space-2);
+      flex: 1;
+      min-height: 0;
+    }
+
+    /* Vertical axis label, rotated to run UP the left edge. y_high reads at the
+       top, y_low at the bottom, matching the grid's high->low rows. */
+    .y-axis {
+      grid-column: 1; grid-row: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      writing-mode: vertical-rl;
+      transform: rotate(180deg);              /* read bottom-up */
+    }
+    .y-axis .axis-name {
+      font-family: var(--font-display);
+      font-weight: var(--weight-headline);
+      font-size: var(--size-caption);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--brand-ink);
+    }
+    .y-axis .axis-end {
+      font-size: var(--size-handle);
+      font-weight: var(--weight-caption);
+      color: var(--brand-muted);
+      letter-spacing: 0.02em;
+    }
+    .y-axis .axis-end:empty { display: none; }
+
+    /* The 2x2 grid of sticker cells. */
+    .matrix-grid {
+      grid-column: 2; grid-row: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+      gap: var(--space-3);
+      min-height: 0;
+    }
+
+    /* Each quadrant = a kit sticker (swatch fill, outline, drop-shadow). The
+       resting state is the FINAL look; layerReveal only scales it in. */
+    .cell {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: var(--space-4);
+      min-width: 0;
+      min-height: 0;
+    }
+    .cell-title {
+      font-family: var(--font-display);
+      font-weight: var(--weight-headline);
+      font-size: 40px;
+      line-height: var(--leading-tight);
+      letter-spacing: -0.02em;
+      color: var(--brand-ink);
+    }
+    .cell-desc {
+      margin-top: var(--space-2);
+      font-family: var(--font-body);
+      font-size: var(--size-caption);
+      font-weight: var(--weight-body);
+      line-height: var(--leading-normal);
+      color: var(--brand-muted);
+    }
+    /* Bare {{quad_xx_desc}} renders empty when absent -> collapse the line. */
+    .cell-desc:empty { display: none; }
+
+    /* The "winning" quadrant flips to the brand accent so it reads at a glance;
+       ink text stays legible on the accent fill (matches bar-chart's accent bar
+       + the .badge ink/bg contrast). */
+    .cell[data-win="true"],
+    .cell[data-win="1"] {
+      --card-fill: var(--brand-accent);
+    }
+    .cell[data-win="true"] .cell-title,
+    .cell[data-win="1"] .cell-title { color: var(--brand-bg); }
+    .cell[data-win="true"] .cell-desc,
+    .cell[data-win="1"] .cell-desc {
+      color: var(--brand-bg);
+      opacity: 0.85;
+    }
+    /* A solid ink chip flags the winner, like bar-chart's accented axis tag. */
+    .cell .win-flag { display: none; }
+    .cell[data-win="true"] .win-flag,
+    .cell[data-win="1"] .win-flag {
+      display: inline-flex;
+      align-self: flex-start;
+      margin-bottom: var(--space-2);
+      background: var(--brand-ink);
+      color: var(--brand-bg);
+      border-style: solid;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    /* Horizontal axis label band under the grid. axis-name centered; end labels
+       pin to the left (x_low) and right (x_high). */
+    .x-axis {
+      grid-column: 2; grid-row: 2;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: var(--space-1);
+      margin-top: var(--space-1);
+    }
+    .x-axis .axis-name {
+      align-self: center;
+      font-family: var(--font-display);
+      font-weight: var(--weight-headline);
+      font-size: var(--size-caption);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--brand-ink);
+    }
+    .x-axis .axis-ends {
+      display: flex;
+      justify-content: space-between;
+    }
+    .x-axis .axis-end {
+      font-size: var(--size-handle);
+      font-weight: var(--weight-caption);
+      color: var(--brand-muted);
+      letter-spacing: 0.02em;
+    }
+    .x-axis .axis-end:empty { display: none; }
+  </style>
+</head>
+<body>
+  <div class="canvas">
+    <header class="canvas-header">
+      {{#eyebrow}}<span class="text-caption">{{eyebrow}}</span>{{/eyebrow}}
+      <span class="accent-dot"></span>
+    </header>
+
+    <main style="flex: 1; display: flex; flex-direction: column; justify-content: center; min-height: 0;">
+      <h1 class="text-headline matrix-headline lockup">
+        <span>{{headline}}</span>{{#pill}} <span class="pill">{{pill}}</span>{{/pill}}
+      </h1>
+      {{#subhead}}<p class="subtitle matrix-sub">{{subhead}}</p>{{/subhead}}
+
+      <div class="matrix-stage">
+        <!-- y-axis: high label at the top, name in the middle, low at the bottom.
+             Rotated 180deg under vertical-rl so it reads bottom-up. -->
+        <div class="y-axis">
+          <span class="axis-end">{{y_high}}</span>
+          {{#y_axis_label}}<span class="axis-name">{{y_axis_label}}</span>{{/y_axis_label}}
+          <span class="axis-end">{{y_low}}</span>
+        </div>
+
+        <!-- 2x2 grid. DOM order matches reading order: TL, TR, BL, BR, so the
+             layerReveal stagger pops the cells top-left -> bottom-right. Fill
+             colours come from the kit palette swatches via .fill-N (never
+             hardcoded); the winning cell overrides to the accent via data-win. -->
+        <div class="matrix-grid">
+          {{#quad_tl_title}}<div class="cell card fill-1" data-win="{{win_tl}}">
+            <span class="tag win-flag">Winner</span>
+            <p class="cell-title">{{quad_tl_title}}</p>
+            <p class="cell-desc">{{quad_tl_desc}}</p>
+          </div>{{/quad_tl_title}}
+          {{#quad_tr_title}}<div class="cell card fill-2" data-win="{{win_tr}}">
+            <span class="tag win-flag">Winner</span>
+            <p class="cell-title">{{quad_tr_title}}</p>
+            <p class="cell-desc">{{quad_tr_desc}}</p>
+          </div>{{/quad_tr_title}}
+          {{#quad_bl_title}}<div class="cell card fill-3" data-win="{{win_bl}}">
+            <span class="tag win-flag">Winner</span>
+            <p class="cell-title">{{quad_bl_title}}</p>
+            <p class="cell-desc">{{quad_bl_desc}}</p>
+          </div>{{/quad_bl_title}}
+          {{#quad_br_title}}<div class="cell card fill-4" data-win="{{win_br}}">
+            <span class="tag win-flag">Winner</span>
+            <p class="cell-title">{{quad_br_title}}</p>
+            <p class="cell-desc">{{quad_br_desc}}</p>
+          </div>{{/quad_br_title}}
+        </div>
+
+        <!-- x-axis: name centered, low->high end labels pinned left/right. -->
+        <div class="x-axis">
+          {{#x_axis_label}}<span class="axis-name">{{x_axis_label}}</span>{{/x_axis_label}}
+          <span class="axis-ends">
+            <span class="axis-end">{{x_low}}</span>
+            <span class="axis-end">{{x_high}}</span>
+          </span>
+        </div>
+      </div>
+    </main>
+
+    <footer class="canvas-footer">
+      <span class="handle">{{attribution}}</span>
+      <span>{{type_label}}</span>
+    </footer>
+  </div>
+
+  <script>
+    /* Animation spec — composes shared primitives from window.__thothMotion,
+       which render.js injects in GIF mode. Static PNG mode never calls build(),
+       so the card renders in its final resting state from CSS. */
+    window.__thothAnim = {
+      duration: 5.2,
+      build: function (gsap) {
+        var M = window.__thothMotion, tl = gsap.timeline({ paused: true });
+        // Title block rises in, then the metric pill pops.
+        M.fadeUp(gsap, tl, '.canvas-header', 0.15, { y: -24, duration: 0.5 });
+        M.fadeUp(gsap, tl, '.matrix-headline', 0.45, { y: 28, duration: 0.55 });
+        M.layerReveal(gsap, tl, '.pill', 0.95, { scaleFrom: 0.5, duration: 0.4 });
+        M.fadeUp(gsap, tl, '.matrix-sub', 1.15, { y: 16, duration: 0.5 });
+        // Axes draw in: the names + end labels fade up from their edges. The
+        // y-axis labels are targeted directly (not the .y-axis box) so GSAP's
+        // transform write never clobbers that box's CSS rotate(180deg).
+        M.fadeUp(gsap, tl, '.y-axis .axis-name, .y-axis .axis-end', 1.5, { y: 0, duration: 0.5, stagger: 0.08 });
+        M.fadeUp(gsap, tl, '.x-axis .axis-name, .x-axis .axis-end', 1.7, { y: 14, duration: 0.5, stagger: 0.08 });
+        // The four quadrants pop in, staggered top-left -> bottom-right.
+        M.layerReveal(gsap, tl, '.cell', 2.0, {
+          scaleFrom: 0.6, origin: '50% 50%', duration: 0.5, stagger: 0.32
+        });
+        // Emphasis: the winning quadrant gets one final pop last.
+        M.layerReveal(gsap, tl, '.cell[data-win="true"], .cell[data-win="1"]', 4.0, {
+          scaleFrom: 0.88, origin: '50% 50%', duration: 0.45
+        });
+        // Footer last.
+        M.fadeUp(gsap, tl, '.canvas-footer', 4.5, { duration: 0.5 });
+        return tl;
+      }
+    };
+  </script>
+</body>
+</html>

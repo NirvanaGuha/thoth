@@ -11,8 +11,8 @@
 }
 
 html, body {
-  width: var(--canvas-size);
-  height: var(--canvas-size);
+  width: var(--canvas-w);
+  height: var(--canvas-h);
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -20,7 +20,7 @@ html, body {
 }
 
 body {
-  background: var(--brand-bg);
+  background: var(--bg-gradient, var(--brand-bg));
   color: var(--brand-ink);
   font-family: var(--font-body);
   font-weight: var(--weight-body);
@@ -47,6 +47,10 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  /* Guaranteed breathing room between the content and the signature. The
+     content region is flex:1, so this margin shrinks it and opens a reliable
+     gap on every template (otherwise tall content abuts the footer). */
+  margin-top: var(--space-5);
   font-size: var(--size-handle);
   font-weight: var(--weight-caption);
   color: var(--brand-muted);
