@@ -11,7 +11,7 @@
 
 **An open-source Claude skill that builds a unique, consistent LinkedIn voice — for yourself, or for your whole team.**
 
-Thoth runs a 20-minute framework-driven interview, pins your voice to proven personality models (Jungian brand archetypes + the Nielsen Norman 4-D tone-of-voice model + contrarian-belief elicitation), and generates ready-to-publish LinkedIn posts across a balanced content mix. Copy-ready text only — Thoth never posts on your behalf.
+Thoth runs a 20-minute framework-driven interview, pins your voice to proven personality models (Jungian brand archetypes + the Nielsen Norman 4-D tone-of-voice model + contrarian-belief elicitation), and generates ready-to-publish LinkedIn posts across a balanced content mix — each paired with a matching animated infographic. Copy-ready, and yours to publish — Thoth never posts on your behalf.
 
 Named after the Egyptian god of writing, who weighed hearts against the feather of truth. Thoth the skill weighs every draft against your persona and refuses to ship anything that doesn't sound like you.
 
@@ -24,28 +24,6 @@ Named after the Egyptian god of writing, who weighed hearts against the feather 
 - **Auto-derived brand.** `/thoth brand` now derives a persona's colours, 5-swatch palette, fonts, and card style from their archetype + tone — no interview. `/thoth brand setup` is the explicit-colour override.
 - **Renderer pipeline.** `puppeteer-core` + your system Chrome (no Chromium download); GSAP timelines are captured frame-by-frame and encoded with `gifski` (or an `ffmpeg` fallback). First run installs deps into `~/.thoth/cache/`.
 - **Coming next:** document/PDF posts and native image carousels — same renderer; the framework catalog already gives us slide structure for free.
-
-## What's new in v1.3
-
-- **Standuply-shaped daily mode.** `/thoth schedule 08:30` now sets up a recurring run that drops a draft into `~/.thoth/inbox/` and pings you with a system notification. Open Claude when you're ready, run `/thoth inbox` to read it.
-- **`/thoth inbox`** — list pending drafts, open one, `accept` to promote it (counts toward ratio), `reject` to skip, `regenerate` to redraft with feedback.
-- **Drafts you never accepted don't skew your ratio.** Only `accepted` posts count toward `/thoth calendar` math and the framework/hook rotation windows.
-
-## What's new in v1.2
-
-- **Framework catalog** — 20 named writing frameworks (4 per post type) replacing the previous one-template-per-type model. Each framework has a documented origin, shape, must-have rules, anti-pattern, and worked spine. Examples: `heretical-claim-receipts-stake` (thought-leadership), `decision-log` (work), `quiet-reveal` (personal), `pmrg` (educational), `story-first-promo` (promotional).
-- **Hook pattern library** — 13 named hook patterns (`inverted-truism`, `micro-confession`, `constraint-reveal`, etc.) composable with any framework, rotated across recent posts.
-- **`/thoth frameworks`** — browse the catalog from inside Claude. `/thoth frameworks <name>` shows a single framework's full spec; `/thoth frameworks hooks` lists the hook compatibility matrix.
-- **Smarter generation** — every post now picks type → framework → hook → topic with explicit rotation windows. Thoth announces the picks before drafting so you can interrupt.
-
-## What's new in v1.1
-
-- **`/thoth update`** — upgrade Thoth in place from inside Claude. Detects how you installed (AM Skills / npx / curl) and runs the right update command. Persona data is never touched.
-- **`/thoth version`** — print the installed version, the skill path, and where your persona data lives.
-- **`/thoth recover`** — restore persona data from past Claude session logs. Use after an upgrade that wiped your data (relevant only for `amskills update` from a v1.0.x install).
-- **Persona data moved out of the skill folder.** Lives at `~/.thoth/` (global) or `./.thoth/` (per-project), independent of `~/.claude/skills/thoth/`. You can grant blanket read/write on your data without exposing Claude's own settings.
-
-> ⚠️ **v1.0.x users upgrading via `amskills update`:** v1.1.0 had a known data-loss issue on this specific upgrade path. **Update to v1.1.1 or later and run `/thoth recover`** to reconstruct your personas from session logs. Full details in [CHANGELOG.md](./CHANGELOG.md).
 
 See [CHANGELOG.md](./CHANGELOG.md) for the full release history.
 
@@ -390,14 +368,18 @@ thoth/
 │   │   ├── onboarding-interview.md
 │   │   ├── content-mix.md
 │   │   ├── post-types.md
+│   │   ├── hook-patterns.md
 │   │   ├── story-arcs.md
 │   │   ├── git-safety.md
 │   │   ├── example-posts.md
 │   │   ├── persona-template.md
+│   │   ├── brand-template.md
 │   │   └── commands.md
-│   ├── personas/                # Your voice data lives here
+│   ├── templates/
+│   │   └── single-image/        # 14 animated infographic templates + _shared kit (tokens, base, components, motion)
+│   ├── personas/                # template only — real persona data lives in ~/.thoth/
 │   │   └── README.md
-│   └── scripts/
+│   └── scripts/                 # render.js (GIF renderer), derive-brand.js, recover.js
 ├── install.sh                   # curl | bash installer
 ├── skill.json                   # skill metadata
 ├── CLAUDE.md                    # dev guide
