@@ -39,6 +39,25 @@ archetype:
 
 ---
 
+## Enneagram
+
+Captures the user's core motivation and core fear — the engine under the archetype. Optional: if onboarding skipped it, omit the block or set `source: skipped`. The `voice_implications` line is what the generate-flow consults; keep it concrete.
+
+```yaml
+enneagram:
+  type: <1-9>
+  type_name: <e.g., "The Achiever">
+  wing: <e.g., 3w4, or omit if unknown>
+  instinct: <sp | so | sx, or omit>
+  secondary_type: <1-9, the close-second type from the report, or omit>
+  core_motivation: <one line — what they're driving toward>
+  core_fear: <one line — what they're steering away from>
+  source: <report | mini-assessment | skipped>
+  voice_implications: <one concrete line on how this shapes the writing>
+```
+
+---
+
 ## Tone
 
 ```yaml

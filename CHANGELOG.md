@@ -2,6 +2,16 @@
 
 All notable changes to Thoth are documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] — 2026-06-26
+
+### Added
+- **Enneagram in onboarding.** The interview now has a dedicated Enneagram section (Section 3) that prompts the user to upload or paste their Enneagram test results (Truity / Enneagram Institute / Crystal / 16Personalities-style reports). Thoth extracts the type, wing, instinctual variant, close-second type, and the core motivation/fear, then writes a concrete `voice_implications` line. No results? An optional 90-second mini-assessment infers a provisional type, or the section can be skipped.
+- **`enneagram:` persona block.** New structured block in `persona.md` (`references/persona-template.md`) holding type / wing / instinct / secondary_type / core_motivation / core_fear / source / voice_implications. The generate-flow and voice check now consult `voice_implications` so the voice rests on *why* the user writes, not just surface tone.
+
+### Changed
+- **Infographics are now truly automatic.** `/thoth` analyzes the post, picks the best-fit template, and renders the GIF in the same turn as the text — no prompt, no waiting for the user to ask. Reworded the workflow so the image is never treated as an optional follow-up step.
+- **De-biased template selection.** Added an explicit anti-default rule against `grid-card` (the N×2 sticker grid), which was being massively over-selected. The generator must now rule out order/flow, comparison, number/trend, and structure/depth shapes before `grid-card` can win — a numbered list routes to `steps-card`, not a grid — and is told to vary templates across consecutive renders.
+
 ## [1.5.0] — 2026-06-14
 
 ### Added

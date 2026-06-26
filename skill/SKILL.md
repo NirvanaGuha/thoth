@@ -1,6 +1,6 @@
 ---
 name: thoth
-version: 1.5.0
+version: 1.6.0
 description: Build and maintain a unique, consistent LinkedIn voice for one or more users. Runs a framework-driven persona interview (brand archetypes + tone spectrum + hot-take exercises), then generates ready-to-publish LinkedIn posts across a 30/25/20/15/10 content mix (Personal / Work / Thought-leadership / Educational / Promotional). Handles multi-user installs — teams, agencies, or families can share one install with a persona per person. Trigger on any `/thoth` command, on phrases like "write a LinkedIn post", "draft a post for [name]", "help me sound more like myself on LinkedIn", "onboard me on Thoth", "set up my LinkedIn voice", or when the user asks for help building a personal brand / thought leadership on LinkedIn. Also trigger when the user references their own posting cadence, content calendar, or wants to regenerate a post. Use this skill instead of writing a generic LinkedIn post whenever the user has a Thoth persona on file.
 ---
 
@@ -130,7 +130,7 @@ Selection runs in four ordered steps before drafting begins. The full algorithm 
 6. **Announce the picks** in one paragraph before drafting:
    > *"Today: Thought-leadership (10pp under target). Framework: `heretical-claim-receipts-stake` (5 posts since last used). Hook: `inverted-truism`. Topic: AI workflows vs prompt training. Drafting now."*
 7. **Draft the post** using:
-   - The voice in `persona.md`.
+   - The voice in `persona.md` — including the `enneagram:` block's `voice_implications` if present (it grounds *why* the user writes; let it shape conviction and emotional register, not just surface tone).
    - The framework's `Shape` block from `post-types.md`.
    - The framework's default arc from `story-arcs.md`.
    - The hook pattern's `Shape` block from `hook-patterns.md`.
@@ -140,7 +140,7 @@ Selection runs in four ordered steps before drafting begins. The full algorithm 
    — type: <type> • framework: <framework> • hook: <hook> • topic: <short> • ~<wordcount> words
    ```
 10. **Log** the new row to `history.yaml` with `date`, `type`, `framework`, `hook_pattern`, `topic`, `wordcount`, and save the draft to `personas/<active>/last-post.md` for regenerate.
-11. **Attach a GIF infographic — automatic** (skip only if the user passed `--no-image`). The generated post ships with a matching animated GIF. **The infographic must visualize the post's core POV — not decorate it.** Before choosing anything, name the post's central claim in one sentence (usually its hook/thesis); the card exists to make *that* land at a glance.
+11. **Attach a GIF infographic — automatic, no prompt required.** This is **not** an optional follow-up step and you must **never** stop to ask the user whether they want an image or wait for them to request one. Every `/thoth` post ships with a matching animated GIF in the **same turn** as the text — analyze the post, pick the template yourself, render it, and present text + GIF together. The only exceptions: the user passed `--no-image`, or no template fits cleanly (see the skip rule below). **The infographic must visualize the post's core POV — not decorate it.** Before choosing anything, name the post's central claim in one sentence (usually its hook/thesis); the card exists to make *that* land at a glance.
     1. **Ensure a brand.** If `personas/<active>/brand.yaml` is missing, auto-derive it (no interview) by running `derive-brand.js` against `persona.md` — see the `/thoth brand` default-behavior step. Explicit user colours, if any, override.
     2. **Pick the infographic type by the SHAPE OF THE POV** — match the form to how the argument is built, not to surface keywords:
        - one **magnitude / result** (a single number *is* the point) → `stat-card`
@@ -158,7 +158,13 @@ Selection runs in four ordered steps before drafting begins. The full algorithm 
        - a **position on a range** (this ↔ that, where things fall) → `spectrum-card`
        - a **collection of N ideas** (an unordered set / examples) → `grid-card`
 
-       If two fit, pick the one that dramatizes the *tension* in the POV. If none fit cleanly, skip rather than force it (or fall back to a static `headline-card`/`quote-card`).
+       **Anti-default rule — do not reach for `grid-card`.** `grid-card` (the N×2 sticker grid) is the single most over-used template and the most common failure mode: almost any post *can* be flattened into "N ideas," so it becomes a lazy catch-all. It is a **last resort**, valid only when the items have genuinely **no order, no comparison, no trend, and no relationship** to one another. Before you may pick it, rule out — in this order — every richer shape:
+       - Is there an **order or flow**? → `steps-card` / `timeline-card` / `flowchart-card` / `cycle-card`
+       - Is anything being **compared or weighed**? → `comparison-card` / `bar-chart-card` / `matrix-card` / `spectrum-card` / `venn-card`
+       - Is there a **number, magnitude, or trend**? → `stat-card` / `line-chart-card`
+       - Is there **structure, depth, or narrowing**? → `layers-card` / `funnel-card`
+
+       Only if all four are honestly "no" does `grid-card` win. A numbered list is `steps-card`, not `grid-card`. When two non-grid templates both fit, pick the one that dramatizes the *tension* in the POV. Across consecutive posts, actively vary the template — if the last post used a given card, prefer a different one when the fit is close. If nothing fits cleanly, skip the image rather than force a `grid-card` (or fall back to a static `headline-card`/`quote-card`).
     3. **Extract the POV into the template's fields** — the headline carries the post's central claim (often the hook), and the body elements are the *structure that proves it*, in the post's own words. Pull the punchiest 2–4 words as the pill/emphasis. The test: someone who reads **only the card** should walk away with the POV. Write the `content.json` to a temp file. (Per-template field rules are in `/thoth image`.)
     4. **Render the GIF** with the persona's `brand.yaml` via `render.js`, using a `.gif` output (portrait 1080×1350, inside LinkedIn's envelope):
        ```sh
@@ -375,6 +381,8 @@ Renders an **animated GIF** from a post draft, at **portrait 1080×1350 (4:5)** 
 | Two axes / four quadrants (position on two dimensions) | `matrix-card` | A 2×2 with an accent "winner" quadrant |
 | A position on a range (this ↔ that, where things fall) | `spectrum-card` | Markers placed along an axis |
 | A collection of N ideas / examples (unordered) | `grid-card` | A grid of idea cards with a colour sweep |
+
+**Anti-default rule — `grid-card` is a last resort.** The N×2 sticker grid is by far the most over-selected template: nearly any post can be flattened into "N ideas," so it becomes a lazy catch-all and the renders end up monotonously similar. Pick `grid-card` **only** when the items have genuinely no order, no comparison, no trend, and no relationship. Before choosing it, rule out a richer shape in this order: (1) order/flow → `steps-card`/`timeline-card`/`flowchart-card`/`cycle-card`; (2) comparison → `comparison-card`/`bar-chart-card`/`matrix-card`/`spectrum-card`/`venn-card`; (3) number/trend → `stat-card`/`line-chart-card`; (4) structure/depth/narrowing → `layers-card`/`funnel-card`. A numbered "N things" list is `steps-card`, **not** `grid-card`. Vary the template across consecutive renders rather than defaulting to the same one.
 
 Legacy static templates `headline-card` and `quote-card` still render (they have no animation timeline, so they always produce a static frame regardless of the `--out` extension). Use them when the post is a single compressed claim or a standalone pull-quote and motion would add nothing.
 
@@ -601,6 +609,7 @@ Recovery scans past Claude Code session JSONL logs at `~/.claude/projects/**/*.j
 Before emitting any generated post, silently verify:
 
 - [ ] The post sounds like the user's **dominant archetype**, with the **secondary** shading it as documented in `persona.md`.
+- [ ] If the persona has an `enneagram:` block, the draft honors its `voice_implications` — it serves the user's core motivation and steers clear of their core fear. (Skip if `source: skipped` or the block is absent.)
 - [ ] Tone sits where the user wants on all four NN dimensions (Formal↔Casual, Serious↔Funny, Respectful↔Irreverent, Matter-of-fact↔Enthusiastic). If any dimension drifts from target, rewrite before emitting.
 - [ ] The opening isn't a LinkedIn cliché ("Excited to share", "I'm humbled to announce", "Thrilled that").
 - [ ] At least one specific, concrete detail (a number, a scene, a name, a micro-observation) — no generic "thought leadership" fog.

@@ -6,7 +6,7 @@ This is the full interview script Thoth runs on `/thoth onboard`. Total time: 20
 
 Confirm to the user:
 
-> *"This will take about 20–30 minutes. We'll cover six short sections — your role and audience, your archetype, your tone, your hot takes, your pillar topics, and your anti-voice. At the end I'll write a persona document you can edit any time with `/thoth edit`. Ready?"*
+> *"This will take about 20–30 minutes. We'll cover seven short sections — your role and audience, your archetype, your Enneagram (optional — bring your test results if you have them), your tone, your hot takes, your pillar topics, and your anti-voice. At the end I'll write a persona document you can edit any time with `/thoth edit`. Ready?"*
 
 Wait for explicit yes. If the user says they're busy, offer: *"We can do the essential 10-minute version — skip the optional follow-ups — and deepen it later. Full or express?"*
 
@@ -122,7 +122,69 @@ archetype:
 
 ---
 
-## Section 3 — Tone Calibration (4 min)
+## Section 3 — Enneagram Profile (optional, 3–5 min)
+
+Goal: capture the user's Enneagram type so the voice rests on their **core motivation and core fear**, not just surface tone. Archetype (Section 2) describes the *role* the voice plays; the Enneagram describes the *engine underneath it* — why they write, what they're avoiding, and the emotional register they default to under pressure. Together they make a far more specific persona.
+
+This section is **optional**. Lead with the upload path — it's the highest-signal input we can get.
+
+### Step 1 — Ask for test results
+
+> *"Have you taken an Enneagram test? If so, paste your results here — or drop in the file/screenshot (a Truity, Enneagram Institute, Crystal, or 16Personalities-style report all work). I'll read the type, wing, and the breakdown and pull out what matters for your voice. If you haven't taken one, say 'no' and we'll do a 90-second mini-version — or just skip it."*
+
+**If the user uploads or pastes a report**, extract and confirm:
+
+- **Dominant type** (1–9) and its name (e.g. "Type 3 — The Achiever").
+- **Wing** (e.g. 3w2 vs 3w4) if the report gives one.
+- **Instinctual variant / subtype** (self-preservation `sp`, social `so`, sexual/one-to-one `sx`) if present.
+- **The top 2–3 scored types**, not just the winner — a close second type often explains a voice that doesn't fit the dominant type cleanly.
+- The report's stated **core motivation** and **core fear** for the type (or infer them from the standard Enneagram descriptions if the report omits them).
+
+Read it back in one short paragraph and ask the user to confirm or correct:
+
+> *"Reading your report: you're a [Type N — Name], [wing] wing, [variant] subtype, with [second type] close behind. The core drive there is [core motivation], and the thing it's steering away from is [core fear]. That tracks with [tie to something they said in Section 1–2]. Sound right?"*
+
+### Step 2 — No results? Optional 90-second mini-assessment
+
+If the user hasn't taken a test and wants the quick version, ask these three and infer a likely type (offer it as a hypothesis, never a verdict):
+
+1. *"When you're at your best, what are you giving the world — competence, help, honesty, vision, calm, loyalty, fun, strength, or harmony?"*
+2. *"Under stress, what's the feeling you're most trying to avoid — being seen as incompetent, unloved, corrupt, ordinary, useless, unsupported, trapped, controlled, or in conflict?"*
+3. *"Do you move toward people, against people, or away from people when things get hard?"*
+
+Map to a tentative type and say: *"This is a guess from three questions — a real test is better. Want me to note it as provisional?"*
+
+If the user declines entirely, mark the section `SKIPPED` and move on. The voice still works on archetype + tone alone.
+
+### Step 3 — Translate to voice implications
+
+Whatever path produced the type, write **one line on how it should shape the writing** — this is the part the generator actually uses. Examples:
+
+- **Type 1 (Reformer):** precise, principled, allergic to sloppiness — but watch for preachiness; soften the "should."
+- **Type 3 (Achiever):** outcome-forward, credible, momentum in every line — but earn it with a real stake, not just wins.
+- **Type 4 (Individualist):** personal, vivid, emotionally honest — leans into what others won't say out loud.
+- **Type 5 (Investigator):** depth, evidence, no hand-waving — but pull the reader in, don't just transmit.
+- **Type 7 (Enthusiast):** energetic, idea-rich, optimistic — but land one point instead of scattering five.
+- **Type 8 (Challenger):** direct, high-conviction, unbothered by pushback — a natural fit for contrarian takes.
+
+Record in `persona.md` under the `enneagram:` block (fields per `references/persona-template.md`). The `voice_implications` line is the load-bearing field — keep it concrete.
+
+```yaml
+enneagram:
+  type: 3
+  type_name: "The Achiever"
+  wing: 3w4
+  instinct: so
+  secondary_type: 8
+  core_motivation: "to be valued for genuine accomplishment"
+  core_fear: "being seen as worthless or a fraud"
+  source: report        # report | mini-assessment | skipped
+  voice_implications: "Outcome-forward and credible, but anchor every claim to a real stake — never hollow wins."
+```
+
+---
+
+## Section 4 — Tone Calibration (4 min)
 
 Goal: pin all four NN tone dimensions with 1–5 targets (see `tone-spectrum.md`).
 
@@ -150,7 +212,7 @@ If the user seems uncertain, offer one existing voice per axis as a reference po
 
 ---
 
-## Section 4 — Hot Takes & Anti-Voice (6 min)
+## Section 5 — Hot Takes & Anti-Voice (6 min)
 
 Run the three exercises in `hot-take-exercises.md`:
 
@@ -164,7 +226,7 @@ Record the exercises' outputs in the `anti_voice:`, `contrarian_beliefs:`, and `
 
 ---
 
-## Section 5 — Pillar Topics & Expertise (4 min)
+## Section 6 — Pillar Topics & Expertise (4 min)
 
 Goal: fill `topics.md` with 3–5 **pillar topics** and 2–4 **areas of expertise**.
 
@@ -205,7 +267,7 @@ Ask:
 
 ---
 
-## Section 6 — Handoffs & Preferences (2 min)
+## Section 7 — Handoffs & Preferences (2 min)
 
 Goal: capture operational preferences.
 
@@ -219,7 +281,7 @@ Record under the `output_preferences:` YAML block in `persona.md` (field names p
 
 ---
 
-## Section 7 — Capture existing voice (optional, 3 min)
+## Section 8 — Capture existing voice (optional, 3 min)
 
 If the user has already posted on LinkedIn or written elsewhere:
 

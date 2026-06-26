@@ -17,6 +17,12 @@ Named after the Egyptian god of writing, who weighed hearts against the feather 
 
 ---
 
+## What's new in v1.6
+
+- **Enneagram onboarding.** The interview now captures your Enneagram — upload or paste your test results (Truity, Enneagram Institute, Crystal, 16Personalities-style) and Thoth pulls out the type, wing, subtype, and core motivation/fear, then translates them into a concrete voice instruction. No test? A 90-second mini-assessment fills in, or skip it. The result grounds your voice in *why* you write, not just how you sound.
+- **Infographics, now hands-free.** `/thoth` analyzes each post, picks the best-fit template, and renders the GIF in the same turn as the text — no extra prompt, no waiting. Opt out with `--no-image`.
+- **Smarter template picks.** Killed the `grid-card` over-bias — the generator now rules out order, comparison, number/trend, and structure shapes before falling back to the N×2 grid, and varies templates across posts.
+
 ## What's new in v1.5
 
 - **Animated infographics.** Every post now ships with a matching animated GIF (portrait 1080×1350, inside LinkedIn's <5MB / <400-frame envelope). `/thoth` auto-attaches one; opt out with `--no-image`. Pass a `.png` output for a static frame.
@@ -39,14 +45,17 @@ See [CHANGELOG.md](./CHANGELOG.md) for the full release history.
 |  20-MINUTE INTERVIEW                                                        |
 |     Section 1 - Role & Audience           2 min                             |
 |     Section 2 - Archetype pinning         6 min   (12 archetypes)           |
-|     Section 3 - Tone calibration          4 min   (4-D spectrum)            |
-|     Section 4 - Hot takes & anti-voice    6 min                             |
-|     Section 5 - Pillar topics             4 min                             |
-|     Section 6 - Handoffs & preferences    2 min                             |
+|     Section 3 - Enneagram profile         3 min   (optional, upload test)   |
+|     Section 4 - Tone calibration          4 min   (4-D spectrum)            |
+|     Section 5 - Hot takes & anti-voice    6 min                             |
+|     Section 6 - Pillar topics             4 min                             |
+|     Section 7 - Handoffs & preferences    2 min                             |
 |                                                                             |
 |  OUTPUT: personas/<you>/persona.md                                          |
 |     archetype.dominant:   sage                                              |
 |     archetype.secondary:  creator                                           |
+|     enneagram.type:       5  (Investigator, 5w4, sp)                        |
+|     enneagram.voice_implications: "depth + evidence, pull reader in"        |
 |     tone.formal_casual:               3                                     |
 |     tone.serious_funny:               2                                     |
 |     tone.respectful_irreverent:       3                                     |
